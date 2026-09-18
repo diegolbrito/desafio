@@ -5,7 +5,7 @@ Decisões de negócio/arquitetura ficam registradas em `SPEC.md` (seção "Premi
 ficam apenas decisões técnicas pontuais tomadas durante a construção.
 
 ## Status geral
-Etapa 3 (persistência) concluída. Próxima: Etapa 4 (REST).
+Etapa 4 (REST) concluída. Próxima: Etapa 5 (OpenAPI).
 
 ## Concluído
 - [x] SPEC.md revisado; seção "Premissas adotadas" preenchida (fórmula de deságio, categorias de
@@ -92,11 +92,58 @@ Etapa 3 (persistência) concluída. Próxima: Etapa 4 (REST).
     (`@Transactional`) será colocado no controller REST na Etapa 4 — como ele é quem invoca o caso
     de uso, isso basta para que os múltiplos `save()` (lote + eventos) façam parte da mesma
     transação, sem precisar vazar Spring para dentro da camada de aplicação.
+- [x] Etapa 4 — REST (pacote `adapter.in.web`):
+  - Casos de uso de consulta que faltavam desde a Etapa 2 (o escopo original só cobria
+    "precificar"): `ListarLotesRecebiveisUseCase`/`Service` e `BuscarLoteRecebiveisUseCase`/
+    `Service`, com ports de saída próprios (`ListarLotesRecebiveisPort`, `BuscarLoteRecebiveisPort`)
+    e projeções somente-leitura em `application.port.out` (`LoteRecebiveisResumo` — sem os
+    recebíveis, usada na listagem — e `LoteRecebiveisDetalhe`, com os recebíveis, usada no GET de
+    detalhe). Motivo de ter duas projeções: evitar N+1 na listagem paginada (critério de
+    desempenho do SPEC) sem abrir mão do detalhe completo na consulta de um único lote.
+  - `LoteRecebiveisQueryAdapter` (lado de leitura, separado do adapter de escrita da Etapa 3 —
+    cada classe com uma única responsabilidade): listagem via `findAll(Pageable)` simples (sem
+    tocar na coleção `recebiveis`, então sem lazy-loading nenhum); detalhe via uma query JPQL
+    própria com `JOIN FETCH` (`buscarComRecebiveisPorId`) — join fetch é seguro aqui porque é uma
+    única linha, não uma página (join fetch + paginação é o cenário problemático, que foi
+    evitado de propósito).
+  - DTOs de request (`LoteRecebiveisRequest`, `RecebivelRequest`) com Bean Validation e mensagens
+    em português. `dataVencimento` **não** tem `@Future`: essa regra é de negócio (rejeita só o
+    item, não o payload inteiro — Premissa 5) e já é aplicada no domínio, não na validação
+    estrutural.
+  - DTOs de response (`LoteRecebiveisResponse`, `RecebivelResponse`, `LoteRecebiveisResumoResponse`,
+    `PaginaResponse<T>`) com fábricas estáticas a partir do domínio (usado logo após o POST, sem
+    round-trip ao banco) ou das projeções de leitura (usado nos GETs).
+  - `LoteRecebiveisController`: `POST` (sempre 201 mesmo com item rejeitado ou lote `ERRO` — a
+    "criação" é o registro auditável em si; o corpo da resposta é que informa o resultado
+    detalhado), `GET` paginado (`page`, `size`, `sort=campo,direcao` com whitelist de campos
+    ordenáveis: `createdAt`, `dataReferencia`, `status`), `GET /{id}` (404 via
+    `RecursoNaoEncontradoException` se não existir).
+  - `GlobalExceptionHandler` com `ProblemDetail` (RFC 9457): 400 validação (com `errors:
+    [{field,message}]`) e JSON malformado, 400 parâmetro inválido, 404 recurso não encontrado, 422
+    regra de negócio (`DomainException`), 409 conflito de versão otimista, 500 genérico (loga a
+    exceção real, nunca vaza detalhe interno na resposta).
+  - `CorrelationIdFilter`: gera `X-Correlation-Id` quando ausente, devolve no header da resposta e
+    propaga via SLF4J MDC durante a requisição (padrão de log em `application.yml` inclui
+    `[%X{correlationId}]`).
+  - `JacksonConfig` + serializador/deserializador customizados de `BigDecimal`: dinheiro e taxas
+    sempre como **string** no JSON (nunca number), conforme a tabela de tipos canônicos do SPEC.
+  - `UseCaseConfig` (camada de composição, `config` package): instancia os 3 casos de uso como
+    beans Spring, injetando os adapters concretos — os próprios casos de uso continuam sem
+    nenhuma anotação do Spring.
+  - Limite transacional (`@Transactional`) no método `POST` do controller, não no
+    `PrecificarLoteService` — mantém a aplicação livre de anotações de framework (decisão já
+    registrada na Etapa 3) enquanto garante que lote + recebíveis + eventos de auditoria sejam
+    persistidos atomicamente.
+  - Teste de integração `LoteRecebiveisControllerIntegrationTest` (MockMvc + Testcontainers):
+    fluxo feliz, rejeição parcial de item sem abortar o lote, 400 (lote vazio, valor negativo),
+    404, e um cenário criar→buscar→listar ponta a ponta, incluindo verificação de que os valores
+    monetários chegam como string no JSON. `mvn test` → 33/33 verdes.
+  - Validado manualmente com a aplicação real rodando (`docker compose up -d db` +
+    `mvn spring-boot:run`) e `curl` contra os 4 endpoints (POST feliz, GET detalhe, GET lista,
+    404, 400) — todas as respostas conferidas manualmente, formatação RFC 9457 e correlation id
+    presentes.
 
 ## Pendente (próximas etapas)
-- [ ] Etapa 4 — REST: DTOs + Bean Validation, `LoteRecebiveisController`
-      (`POST`/`GET /api/v1/lotes-recebiveis`), `GlobalExceptionHandler` (RFC 9457),
-      `X-Correlation-Id` + testes de integração.
 - [ ] Etapa 5 — OpenAPI exportado (springdoc).
 - [ ] Etapa 6 — Frontend scaffolding (Vite + React 19.3 + TS, ESLint/Prettier, tipos gerados do
       OpenAPI, client HTTP + TanStack Query).
@@ -165,3 +212,20 @@ Etapa 3 (persistência) concluída. Próxima: Etapa 4 (REST).
   Esses dois `-e` ficam documentados aqui porque são **específicos deste ambiente de
   desenvolvimento** (Docker Desktop for Windows sem Maven/JDK local) — não são necessários quando
   se roda `mvn test` com Maven/JDK instalados diretamente no host, nem em CI Linux nativo.
+- **Spring Boot 4.1 migrou para Jackson 3** (`tools.jackson.*`), que renomeou pacotes e classes em
+  relação ao Jackson 2 clássico (`com.fasterxml.jackson.*`): `JsonSerializer`→`ValueSerializer`,
+  `JsonDeserializer`→`ValueDeserializer`, `Module`→`JacksonModule`, e `JsonGenerator`/`JsonParser`
+  agora vivem em `tools.jackson.core` (não mais `com.fasterxml.jackson.core`). Além disso,
+  `spring-boot-starter-web` **não** traz `jackson-databind` transitivamente nesta versão — foi
+  preciso adicionar `tools.jackson.core:jackson-databind` explicitamente no `pom.xml`. Os métodos
+  de serialização também trocaram `throws IOException` por `throws JacksonException`. Isso afeta
+  qualquer customização de serialização (`BigDecimalPlainStringSerializer`/
+  `BigDecimalLenientDeserializer` em `config/json/`) e é bom lembrar caso apareçam mais
+  customizações de Jackson nas próximas etapas.
+- **`AutoConfigureMockMvc` mudou de módulo e pacote** no Boot 4.1: não vem mais em
+  `spring-boot-starter-test`; é preciso `spring-boot-starter-webmvc-test` (dependência de teste
+  separada) e o import correto é `org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc`
+  (não mais `org.springframework.boot.test.autoconfigure.web.servlet`).
+- `HttpStatus.UNPROCESSABLE_ENTITY` foi depreciado no Spring 7 em favor de
+  `HttpStatus.UNPROCESSABLE_CONTENT` (RFC 9110 renomeou a reason phrase do 422); usado no
+  `GlobalExceptionHandler`.

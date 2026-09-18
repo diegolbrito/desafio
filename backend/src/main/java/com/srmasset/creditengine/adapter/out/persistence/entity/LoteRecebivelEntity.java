@@ -81,4 +81,8 @@ public class LoteRecebivelEntity {
     public List<RecebivelEntity> getRecebiveis() {
         return recebiveis;
     }
+
+    public OffsetDateTime getCreatedAt() {
+        return createdAt;
+    }
 }
