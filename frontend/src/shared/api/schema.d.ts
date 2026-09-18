@@ -161,8 +161,8 @@ export interface operations {
             };
         };
         responses: {
-            /** @description OK */
-            200: {
+            /** @description Lote recebido e processado */
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };

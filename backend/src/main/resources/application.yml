@@ -21,6 +21,10 @@ credit-engine:
   # spread de risco na formula de desagio (ver SPEC.md, "Premissas adotadas" item 4).
   # Parametro estavel, por isso vive na aplicacao e nao em tabela de referencia no banco.
   custo-operacional: ${CUSTO_OPERACIONAL:0.005}
+  cors:
+    # Origens do frontend autorizadas a chamar a API (politica de navegador,
+    # nao autenticacao). Lista separada por virgula.
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
 
 logging:
   pattern:

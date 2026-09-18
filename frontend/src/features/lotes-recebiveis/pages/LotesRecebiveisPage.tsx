@@ -1,12 +1,15 @@
-/**
- * Placeholder de scaffolding (Etapa 6). A feature completa (formulario,
- * listagem paginada, detalhe do lote) e' implementada na Etapa 7.
- */
+import { LoteRecebiveisForm } from '../components/LoteRecebiveisForm'
+import { LotesRecebiveisListagem } from '../components/LotesRecebiveisListagem'
+import { TEXTOS } from '../constants/textos'
+
 export function LotesRecebiveisPage() {
   return (
     <main>
-      <h1>SRM Credit Engine</h1>
-      <p>Precificacao e registro auditavel de lotes de recebiveis.</p>
+      <h1>{TEXTOS.app.titulo}</h1>
+      <p>{TEXTOS.app.subtitulo}</p>
+
+      <LoteRecebiveisForm />
+      <LotesRecebiveisListagem />
     </main>
   )
 }
