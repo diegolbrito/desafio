@@ -61,8 +61,8 @@ paths:
               $ref: "#/components/schemas/LoteRecebiveisRequest"
         required: true
       responses:
-        "200":
-          description: OK
+        "201":
+          description: Lote recebido e processado
           content:
             '*/*':
               schema:

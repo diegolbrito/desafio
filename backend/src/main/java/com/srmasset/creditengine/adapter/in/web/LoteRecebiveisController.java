@@ -13,6 +13,7 @@ import com.srmasset.creditengine.application.port.in.PrecificarLoteUseCase;
 import com.srmasset.creditengine.application.port.out.DirecaoOrdenacao;
 import com.srmasset.creditengine.domain.LoteRecebiveis;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -58,6 +59,7 @@ public class LoteRecebiveisController {
     @Operation(summary = "Recebe e precifica um lote de recebiveis",
             description = "Calcula o desagio de cada recebivel do lote e registra o resultado de forma auditavel. "
                     + "Retorna 201 mesmo se algum recebivel for rejeitado individualmente (ver campo status de cada item).")
+    @ApiResponse(responseCode = "201", description = "Lote recebido e processado")
     public ResponseEntity<LoteRecebiveisResponse> criar(@Valid @RequestBody LoteRecebiveisRequest request,
                                                           UriComponentsBuilder uriBuilder) {
         ComandoPrecificarLote comando = paraComando(request);

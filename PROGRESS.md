@@ -5,7 +5,8 @@ Decisões de negócio/arquitetura ficam registradas em `SPEC.md` (seção "Premi
 ficam apenas decisões técnicas pontuais tomadas durante a construção.
 
 ## Status geral
-Etapa 6 (frontend scaffolding) concluída. Próxima: Etapa 7 (feature lotes-recebiveis no frontend).
+Etapa 7 (feature lotes-recebiveis no frontend) concluída. Próxima: Etapa 8 (docker-compose completo
++ validação end-to-end).
 
 ## Concluído
 - [x] SPEC.md revisado; seção "Premissas adotadas" preenchida (fórmula de deságio, categorias de
@@ -194,10 +195,56 @@ Etapa 6 (frontend scaffolding) concluída. Próxima: Etapa 7 (feature lotes-rece
     funcionam normalmente via bind mount); e `tsc -b` com project references exigia emit e gerava
     `vite.config.js`/`.d.ts` indesejados — resolvido simplificando para um único `tsconfig.json`
     (sem `composite`/`references`) e `tsc --noEmit` no lugar de `tsc -b`.
+- [x] Etapa 7 — Feature `lotes-recebiveis` completa no frontend:
+  - Design system mínimo em `shared/ui`: `Button`, `TextField`, `Select` (com label + erro
+    acessível via `aria-invalid`/`aria-describedby`, `forwardRef` para funcionar com
+    `register()` do RHF), `Alert` (`role="alert"`/`role="status"`), `Pagination`. Tokens de tema
+    (cores, raio) centralizados em `index.css` como CSS custom properties. Estilização via CSS
+    Modules (sem framework de UI — não pedido no SPEC).
+  - `constants/textos.ts`: todos os textos de UI centralizados (sem string literal em JSX).
+  - `utils/formatters.ts`: formatação monetária/percentual/data só na camada de exibição
+    (`Intl.NumberFormat`/`Intl.DateTimeFormat`, sempre locale `pt-BR` mesmo para USD — só o
+    símbolo muda, os separadores continuam pt-BR, conforme a convenção do SPEC).
+  - `api/lotesRecebiveisApi.ts`: funções tipadas a partir do `schema.d.ts` gerado (`components['schemas'][...]`)
+    — único ponto de acesso à rede da feature.
+  - Hooks TanStack Query: `useLotesRecebiveis` (lista, paginado, `keepPreviousData`),
+    `useLoteRecebiveis` (detalhe), `useCriarLoteRecebiveis` (mutation, invalida a query de lista
+    no sucesso).
+  - `LoteRecebiveisForm`: React Hook Form + Zod (`loteRecebiveisFormSchema.ts`, espelha a
+    validação da API) com `useFieldArray` para múltiplos recebíveis por lote (adicionar/remover
+    linhas, mínimo 1). Proteção contra submissão dupla via `disabled={isPending}` no botão.
+    Mensagem de sucesso/erro inline após o submit.
+  - `LotesRecebiveisListagem` e `LoteRecebiveisDetalhe`: tratam loading/vazio/erro/sucesso
+    explicitamente, com `StatusBadge` colorido por status.
+  - Rotas: `/` (form + listagem) e `/lotes-recebiveis/:id` (detalhe), com `errorElement`
+    (`RotaErro`) para falhas inesperadas em cada rota.
+  - 22 testes (Vitest + Testing Library + `@testing-library/user-event`): formatadores (funções
+    puras), formulário (adicionar/remover linha, validação, submit com sucesso/erro mockando a
+    API via `vi.mock`), listagem (loading/vazio/erro/paginação), detalhe (valores formatados,
+    motivo de rejeição, erro), página (smoke test). `npm test` → 22/22 verdes.
+  - **CORS descoberto e corrigido**: como o frontend (porta 5173) chama a API (porta 8080)
+    diretamente, testei manualmente com `curl -H "Origin: http://localhost:5173"` contra o
+    backend real e confirmei que um navegador bloquearia as chamadas (sem
+    `Access-Control-Allow-Origin` na resposta). Adicionado `CorsConfig` no backend
+    (`credit-engine.cors.allowed-origins`, configurável via `CORS_ALLOWED_ORIGINS`, default
+    `http://localhost:5173`) — é política de navegador, não autenticação, então não conflita com
+    a decisão do SPEC de não proteger as APIs. Reconfirmado via `curl` que o preflight e a
+    resposta real agora incluem os headers CORS corretos.
+  - Corrigido também um detalhe pendente da Etapa 5: o endpoint `POST` retornava 201 de verdade
+    mas o OpenAPI documentava 200 (springdoc não sabia sem `@ApiResponse` explícito) — corrigido,
+    spec e tipos do frontend regenerados.
+  - `mvn test` (backend, para confirmar que `CorsConfig` não quebrou nada) → 33/33 verdes.
+    Build de produção do frontend validado: bundle inicial ~475 kB raw / ~149 kB gzip (dentro do
+    orçamento de 500 KB do SPEC, mas com pouca folga em bytes crus — vale observar em mudanças
+    futuras).
+  - Validado end-to-end de fato: subi backend real + frontend real (dev server) apontando um
+    para o outro via `VITE_API_BASE_URL`, confirmei a variável de ambiente injetada corretamente
+    no bundle servido e os headers CORS presentes nas respostas. Não há navegador disponível
+    neste ambiente para um teste visual manual — a validação de comportamento de UI ficou por
+    conta dos testes automatizados com Testing Library (que simulam DOM/acessibilidade fielmente)
+    combinados com essa verificação de integração real via curl.
 
 ## Pendente (próximas etapas)
-- [ ] Etapa 7 — Feature `lotes-recebiveis` no frontend (formulário RHF+Zod, listagem paginada,
-      detalhe do lote) + testes de componentes/hooks.
 - [ ] Etapa 8 — `docker-compose.yml` completo (db + backend + frontend) + validação end-to-end
       manual.
 
