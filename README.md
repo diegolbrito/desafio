@@ -116,6 +116,49 @@ npm run dev
 Configure a URL da API em `frontend/.env` (veja `frontend/.env.example`) se o backend não estiver
 em `http://localhost:8080`.
 
+## Depurar o backend (debug remoto)
+
+Como o backend roda via Docker (sem Maven/JDK 25 instalados localmente), a forma de debugar é
+anexar o VS Code a uma JVM remota com o agente JDWP habilitado.
+
+**Pré-requisito**: extensão [Extension Pack for Java](https://marketplace.visualstudio.com/items?itemName=vscjava.vscode-java-pack)
+no VS Code (inclui o debugger e o suporte de linguagem necessários).
+
+Suba o backend com a porta de debug exposta e o agente JDWP ligado:
+
+```powershell
+# PowerShell (padrão no Windows)
+docker compose up -d db
+
+docker run -d --name credit-engine-app -p 8080:8080 -p 5005:5005 -v "${PWD}/backend:/app" -w /app -v maven-repo-cache:/root/.m2 -e DB_HOST=host.docker.internal maven:3.9.11-eclipse-temurin-25 mvn -B spring-boot:run "-Dspring-boot.run.jvmArguments=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
+```
+
+```bash
+# Bash / Git Bash / macOS / Linux
+docker compose up -d db
+
+docker run -d --name credit-engine-app -p 8080:8080 -p 5005:5005 \
+  -v "$(pwd)/backend:/app" -w /app -v maven-repo-cache:/root/.m2 \
+  -e DB_HOST=host.docker.internal \
+  maven:3.9.11-eclipse-temurin-25 mvn -B spring-boot:run \
+  -Dspring-boot.run.jvmArguments="-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
+```
+
+> **Atenção**: os dois comandos não são intercambiáveis. O PowerShell não continua o comando na
+> linha seguinte com `\` (ele executa cada linha separada, então o container sobe sem o
+> `mvn spring-boot:run` de verdade e morre na hora — sintoma: "sobe e encerra em seguida"). Use o
+> bloco do shell que você está usando de fato.
+
+Coloque breakpoints no código e rode a configuração **"Attach ao backend (Docker)"** no painel
+*Run and Debug* (F5) — já está em [`.vscode/launch.json`](.vscode/launch.json). Como o container
+usa bind mount dos mesmos arquivos que você edita, os breakpoints resolvem normalmente contra o
+código-fonte.
+
+Use `suspend=y` no lugar de `suspend=n` se quiser que a aplicação espere o debugger conectar antes
+de terminar de subir (útil para depurar código que roda no startup).
+
+Pare o container de debug com `docker stop credit-engine-app && docker rm credit-engine-app`.
+
 ## Testes
 
 ```bash
