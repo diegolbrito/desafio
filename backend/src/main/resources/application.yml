@@ -15,3 +15,13 @@ spring:
 
 server:
   port: ${SERVER_PORT:8080}
+
+credit-engine:
+  # Spread fixo de custo operacional (fracao decimal, a.a.) somado a taxa base +
+  # spread de risco na formula de desagio (ver SPEC.md, "Premissas adotadas" item 4).
+  # Parametro estavel, por isso vive na aplicacao e nao em tabela de referencia no banco.
+  custo-operacional: ${CUSTO_OPERACIONAL:0.005}
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%X{correlationId}] %logger{36} - %msg%n"
