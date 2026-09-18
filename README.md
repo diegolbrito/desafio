@@ -55,6 +55,15 @@ docker compose down -v    # idem, mas também apaga o volume do banco (reset tot
 | Swagger UI | http://localhost:8080/swagger-ui/index.html |
 | OpenAPI JSON/YAML | http://localhost:8080/v3/api-docs ou `/v3/api-docs.yaml` |
 
+## Chamando a API (Bruno)
+
+A pasta [`bruno/`](bruno/) é uma coleção do [Bruno](https://www.usebruno.com/) pronta pra usar —
+abra a pasta direto no Bruno ("Open Collection") e já aparecem os requests (`Criar lote`,
+`Criar lote (item rejeitado)`, `Listar lotes`, `Buscar lote por id`) e dois ambientes (`Local`,
+porta 8080 direto no backend; `Docker Compose`, porta 3000 via proxy do frontend). Escolha o
+ambiente no canto superior direito antes de rodar. Alternativa: importar `openapi.yaml` direto no
+Bruno (File > Import > OpenAPI Collection) para gerar os requests automaticamente a partir do spec.
+
 ## Banco de dados
 
 Credenciais (definidas em [`docker-compose.yml`](docker-compose.yml)):

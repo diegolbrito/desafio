@@ -1,0 +1,22 @@
+meta {
+  name: Listar lotes
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/lotes-recebiveis?page=0&size=20&sort=createdAt,desc
+  body: none
+  auth: none
+}
+
+params:query {
+  page: 0
+  size: 20
+  sort: createdAt,desc
+}
+
+docs {
+  Lista paginada (sem os recebiveis de cada lote - use "Buscar lote por id" pro
+  detalhe). Campos ordenaveis: createdAt, dataReferencia, status.
+}
