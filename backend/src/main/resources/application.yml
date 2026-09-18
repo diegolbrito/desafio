@@ -1,0 +1,17 @@
+spring:
+  application:
+    name: credit-engine
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:credit_engine}
+    username: ${DB_USER:credit_engine}
+    password: ${DB_PASSWORD:credit_engine}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+server:
+  port: ${SERVER_PORT:8080}
