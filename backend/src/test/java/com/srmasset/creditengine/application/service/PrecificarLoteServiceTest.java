@@ -1,0 +1,119 @@
+package com.srmasset.creditengine.application.service;
+
+import com.srmasset.creditengine.application.exception.ReferenciaNaoEncontradaException;
+import com.srmasset.creditengine.application.port.in.ComandoPrecificarLote;
+import com.srmasset.creditengine.application.port.out.CategoriaRiscoRepositoryPort;
+import com.srmasset.creditengine.application.port.out.RegistrarEventoTransacaoPort;
+import com.srmasset.creditengine.application.port.out.SalvarLoteRecebiveisPort;
+import com.srmasset.creditengine.application.port.out.TaxaBaseRepositoryPort;
+import com.srmasset.creditengine.domain.CategoriaRisco;
+import com.srmasset.creditengine.domain.LoteRecebiveis;
+import com.srmasset.creditengine.domain.Moeda;
+import com.srmasset.creditengine.domain.StatusLote;
+import com.srmasset.creditengine.domain.StatusRecebivel;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.util.List;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class PrecificarLoteServiceTest {
+
+    private static final Clock RELOGIO_FIXO = Clock.fixed(Instant.parse("2026-09-18T00:00:00Z"), ZoneOffset.UTC);
+
+    @Mock
+    private TaxaBaseRepositoryPort taxaBaseRepository;
+    @Mock
+    private CategoriaRiscoRepositoryPort categoriaRiscoRepository;
+    @Mock
+    private SalvarLoteRecebiveisPort salvarLotePort;
+    @Mock
+    private RegistrarEventoTransacaoPort registrarEventoPort;
+
+    private PrecificarLoteService service;
+
+    @BeforeEach
+    void setUp() {
+        service = new PrecificarLoteService(taxaBaseRepository, categoriaRiscoRepository,
+                salvarLotePort, registrarEventoPort, new BigDecimal("0.005"), RELOGIO_FIXO);
+
+        when(salvarLotePort.salvar(any())).thenAnswer(invocation -> {
+            LoteRecebiveis lote = invocation.getArgument(0);
+            lote.atribuirId(UUID.randomUUID());
+            lote.getRecebiveis().forEach(r -> r.atribuirId(UUID.randomUUID()));
+            return lote;
+        });
+    }
+
+    @Test
+    void precificaTodosOsItensQuandoDadosSaoValidos() {
+        when(taxaBaseRepository.buscarTaxaVigente(Moeda.BRL)).thenReturn(new BigDecimal("0.1065"));
+        when(categoriaRiscoRepository.buscarSpread(CategoriaRisco.B)).thenReturn(new BigDecimal("0.035"));
+
+        ComandoPrecificarLote comando = new ComandoPrecificarLote(List.of(
+                new ComandoPrecificarLote.ComandoRecebivel("Cedente A", new BigDecimal("1000.00"),
+                        Moeda.BRL, LocalDate.of(2026, 12, 31), CategoriaRisco.B),
+                new ComandoPrecificarLote.ComandoRecebivel("Cedente B", new BigDecimal("2000.00"),
+                        Moeda.BRL, LocalDate.of(2027, 1, 15), CategoriaRisco.B)
+        ));
+
+        LoteRecebiveis lote = service.precificar(comando);
+
+        assertThat(lote.getStatus()).isEqualTo(StatusLote.PRECIFICADO);
+        assertThat(lote.getRecebiveis()).allMatch(r -> r.getStatus() == StatusRecebivel.PRECIFICADO);
+        verify(salvarLotePort).salvar(any());
+        // 1 lote_recebido + 2 recebiveis precificados + 1 lote_precificado
+        verify(registrarEventoPort, times(4)).registrar(any());
+    }
+
+    @Test
+    void rejeitaApenasOItemComVencimentoInvalidoSemAbortarOLote() {
+        when(taxaBaseRepository.buscarTaxaVigente(Moeda.BRL)).thenReturn(new BigDecimal("0.1065"));
+        when(categoriaRiscoRepository.buscarSpread(CategoriaRisco.B)).thenReturn(new BigDecimal("0.035"));
+
+        ComandoPrecificarLote comando = new ComandoPrecificarLote(List.of(
+                new ComandoPrecificarLote.ComandoRecebivel("Cedente A", new BigDecimal("1000.00"),
+                        Moeda.BRL, LocalDate.of(2026, 9, 18), CategoriaRisco.B), // vencimento == dataReferencia
+                new ComandoPrecificarLote.ComandoRecebivel("Cedente B", new BigDecimal("2000.00"),
+                        Moeda.BRL, LocalDate.of(2027, 1, 15), CategoriaRisco.B)
+        ));
+
+        LoteRecebiveis lote = service.precificar(comando);
+
+        assertThat(lote.getStatus()).isEqualTo(StatusLote.PRECIFICADO);
+        assertThat(lote.getRecebiveis().get(0).getStatus()).isEqualTo(StatusRecebivel.REJEITADO);
+        assertThat(lote.getRecebiveis().get(0).getMotivoRejeicao()).isNotBlank();
+        assertThat(lote.getRecebiveis().get(1).getStatus()).isEqualTo(StatusRecebivel.PRECIFICADO);
+    }
+
+    @Test
+    void marcaLoteComErroQuandoTaxaBaseNaoEncontrada() {
+        when(taxaBaseRepository.buscarTaxaVigente(Moeda.USD))
+                .thenThrow(new ReferenciaNaoEncontradaException("Taxa base nao configurada para USD"));
+
+        ComandoPrecificarLote comando = new ComandoPrecificarLote(List.of(
+                new ComandoPrecificarLote.ComandoRecebivel("Cedente A", new BigDecimal("1000.00"),
+                        Moeda.USD, LocalDate.of(2026, 12, 31), CategoriaRisco.B)
+        ));
+
+        LoteRecebiveis lote = service.precificar(comando);
+
+        assertThat(lote.getStatus()).isEqualTo(StatusLote.ERRO);
+        verify(salvarLotePort).salvar(any());
+    }
+}

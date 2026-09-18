@@ -5,7 +5,7 @@ Decisões de negócio/arquitetura ficam registradas em `SPEC.md` (seção "Premi
 ficam apenas decisões técnicas pontuais tomadas durante a construção.
 
 ## Status geral
-Etapa 1 (domínio puro) concluída. Próxima: Etapa 2 (aplicação).
+Etapa 2 (aplicação) concluída. Próxima: Etapa 3 (persistência).
 
 ## Concluído
 - [x] SPEC.md revisado; seção "Premissas adotadas" preenchida (fórmula de deságio, categorias de
@@ -40,9 +40,31 @@ Etapa 1 (domínio puro) concluída. Próxima: Etapa 2 (aplicação).
   - 19 testes unitários (JUnit5 + AssertJ, sem Spring) cobrindo fórmula (BRL/USD, casos
     verificáveis manualmente, invariante valorPresente+deságio=valorBruto, arredondamento) e
     invariantes/transições de `Recebivel`/`LoteRecebiveis`. `mvn test` → 19/19 verdes.
+- [x] Etapa 2 — Aplicação (pacote `application`, depende só de `domain` e das próprias ports):
+  - Também no `domain`: `EventoTransacao` (record, fábricas estáticas por tipo de fato auditável)
+    e `TipoEventoTransacao`, cobrindo o requisito de "registrar a transação de forma auditável".
+  - Port de entrada `PrecificarLoteUseCase` + `ComandoPrecificarLote` (DTO de entrada do caso de
+    uso; a data de referência da precificação **não** é informada pelo chamador — é resolvida
+    internamente via `Clock`, conforme a Premissa 1 do SPEC: "data de entrada do lote").
+  - Ports de saída pequenas e específicas (uma por finalidade, não uma interface genérica de
+    repositório): `SalvarLoteRecebiveisPort`, `TaxaBaseRepositoryPort`,
+    `CategoriaRiscoRepositoryPort`, `RegistrarEventoTransacaoPort`.
+  - `ReferenciaNaoEncontradaException` (pacote `application.exception`): erro sistêmico quando
+    taxa base/spread de categoria não está cadastrado — distinto das exceções de domínio, pois
+    representa falha de configuração, não violação de regra de negócio.
+  - `PrecificarLoteService`: orquestra o caso de uso — monta o agregado, precifica cada recebível
+    (rejeitando individualmente quem tiver prazo inválido, sem abortar o lote), marca o lote
+    `ERRO` se a referência de taxa/spread estiver ausente, persiste via `SalvarLoteRecebiveisPort`
+    e registra os eventos de auditoria (`LOTE_RECEBIDO`, um por recebível processado,
+    `LOTE_PRECIFICADO`/`LOTE_ERRO`) via `RegistrarEventoTransacaoPort`. Custo operacional recebido
+    como `BigDecimal` no construtor (valor vindo de configuração da aplicação, não do banco — a
+    camada de composição na Etapa 4 vai ler isso de `application.yml`).
+  - 3 testes unitários (JUnit5 + Mockito, mocks das 4 ports de saída): fluxo feliz (2 itens
+    precificados), item com vencimento inválido rejeitado sem abortar o lote, e lote marcado
+    `ERRO` quando a taxa base não é encontrada. `mvn test` → 22/22 verdes (19 do domínio + 3 da
+    aplicação).
 
 ## Pendente (próximas etapas)
-- [ ] Etapa 2 — Aplicação: ports de entrada/saída, `PrecificarLoteService` + testes com mocks.
 - [ ] Etapa 3 — Persistência: migrations Flyway (`lote_recebivel`, `recebivel`, `categoria_risco`
       seed, `taxa_base` seed, `transacao_evento` append-only), entidades JPA, repositories +
       testes de integração (Testcontainers).
@@ -82,3 +104,7 @@ Etapa 1 (domínio puro) concluída. Próxima: Etapa 2 (aplicação).
   exp/log inteiramente em `BigDecimal` com `MathContext` configurável — sem perda de precisão e
   sem usar `double`. É uma dependência puramente matemática (sem I/O/framework), portanto não
   quebra a regra do domínio não depender de infraestrutura.
+- Mockito emite warning de deprecação sobre self-attach de agent no JDK 25 durante os testes com
+  mock (`PrecificarLoteServiceTest`). Não falha o build; é um aviso já conhecido do Mockito em
+  JDKs recentes. Se incomodar futuramente, resolve-se configurando o agent explicitamente no
+  `maven-surefire-plugin` (`-javaagent`) — não fiz isso agora por ser só um warning.
