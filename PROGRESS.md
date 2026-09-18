@@ -5,8 +5,10 @@ Decisões de negócio/arquitetura ficam registradas em `SPEC.md` (seção "Premi
 ficam apenas decisões técnicas pontuais tomadas durante a construção.
 
 ## Status geral
-Etapa 7 (feature lotes-recebiveis no frontend) concluída. Próxima: Etapa 8 (docker-compose completo
-+ validação end-to-end).
+**Todas as 8 etapas do plano original concluídas.** Backend (hexagonal, Spring Boot 4.1/Java 25) e
+frontend (React 19.3/TS) implementados, testados e validados end-to-end via `docker-compose`
+completo (db + backend + frontend). Não há próxima etapa planejada; próximos passos ficariam a
+critério do usuário (ex.: revisão geral, ajustes de UX, deploy real).
 
 ## Concluído
 - [x] SPEC.md revisado; seção "Premissas adotadas" preenchida (fórmula de deságio, categorias de
@@ -244,9 +246,33 @@ Etapa 7 (feature lotes-recebiveis no frontend) concluída. Próxima: Etapa 8 (do
     conta dos testes automatizados com Testing Library (que simulam DOM/acessibilidade fielmente)
     combinados com essa verificação de integração real via curl.
 
-## Pendente (próximas etapas)
-- [ ] Etapa 8 — `docker-compose.yml` completo (db + backend + frontend) + validação end-to-end
-      manual.
+- [x] Etapa 8 — `docker-compose.yml` completo e validação end-to-end:
+  - `backend/Dockerfile` (multi-stage: `maven:3.9.11-eclipse-temurin-25` para build,
+    `eclipse-temurin:25-jre` para runtime — imagem final sem Maven/JDK completo).
+  - `frontend/Dockerfile` (multi-stage: `node:22` para build, `nginx:1.27-alpine` para servir o
+    bundle estático) + `nginx.conf`.
+  - **Decisão de arquitetura**: o nginx do frontend faz proxy de `/api/*` para o serviço
+    `backend:8080` dentro da rede do compose. Isso faz o navegador enxergar frontend e API na
+    **mesma origem** (`http://localhost:3000`), eliminando CORS nesse cenário — `VITE_API_BASE_URL`
+    é passada vazia (`""`) como build arg, então o `httpClient` usa caminho relativo
+    (`/api/v1/...`). A configuração de CORS da Etapa 7 continua existindo e é usada no
+    desenvolvimento local (`npm run dev`, origem `http://localhost:5173`, porta diferente da API).
+  - `docker-compose.yml`: `db` (Postgres 18, já existia), `backend` (porta 8080 exposta também
+    diretamente, `depends_on: db` com `condition: service_healthy`), `frontend` (porta 3000→80,
+    `depends_on: backend`).
+  - **Bug real encontrado e corrigido na validação end-to-end**: o header `Location` de um `201`
+    voltava como `http://localhost/api/...` (porta 80 implícita, errada) em vez de
+    `http://localhost:3000/api/...`, porque o backend não sabia que estava atrás de um proxy
+    reverso em outra porta. Corrigido com `server.forward-headers-strategy: framework` no
+    backend (ativa o `ForwardedHeaderFilter` do Spring) + `proxy_set_header X-Forwarded-Proto`/
+    `X-Forwarded-Port` no `nginx.conf`. Reconfirmado via `curl` que o `Location` passou a vir
+    correto.
+  - Validação end-to-end real (não mockada): subi a stack completa via `docker compose up -d`,
+    aguardei o backend inicializar de verdade, e testei via `curl` contra a porta 3000 (a mesma
+    que um navegador acessaria): `GET /` retorna o HTML do frontend, `GET /api/v1/lotes-recebiveis`
+    e `POST /api/v1/lotes-recebiveis` funcionam através do proxy do nginx, o lote criado aparece
+    na listagem em seguida, e a porta 8080 do backend continua acessível diretamente (inclusive
+    o Swagger UI). `mvn test` (backend) → 33/33 verdes após as mudanças desta etapa.
 
 ## Decisões técnicas tomadas durante a implementação
 - Ambiente local não possui Maven/Node/JDK 25 instalados (apenas JDK 24 e Docker Desktop

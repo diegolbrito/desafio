@@ -15,5 +15,32 @@ services:
       timeout: 5s
       retries: 10
 
+  backend:
+    build:
+      context: ./backend
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: credit_engine
+      DB_USER: credit_engine
+      DB_PASSWORD: credit_engine
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Vazio: o nginx do frontend repassa /api para o servico backend, entao
+        # o browser sempre chama caminho relativo (mesma origem do frontend).
+        VITE_API_BASE_URL: ""
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
 volumes:
   db_data:
