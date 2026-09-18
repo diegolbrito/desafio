@@ -67,14 +67,14 @@ class PersistenciaIntegrationTest {
 
     @Test
     void seedsDeTaxaBaseEstaoDisponiveis() {
-        assertThat(taxaBaseAdapter.buscarTaxaVigente(Moeda.BRL)).isEqualByComparingTo("0.106500");
-        assertThat(taxaBaseAdapter.buscarTaxaVigente(Moeda.USD)).isEqualByComparingTo("0.048000");
+        assertThat(taxaBaseAdapter.buscarTaxaVigente(Moeda.BRL)).isEqualByComparingTo("0.008469");
+        assertThat(taxaBaseAdapter.buscarTaxaVigente(Moeda.USD)).isEqualByComparingTo("0.003915");
     }
 
     @Test
     void seedsDeCategoriaRiscoEstaoDisponiveis() {
-        assertThat(categoriaRiscoAdapter.buscarSpread(CategoriaRisco.AA)).isEqualByComparingTo("0.010000");
-        assertThat(categoriaRiscoAdapter.buscarSpread(CategoriaRisco.E)).isEqualByComparingTo("0.120000");
+        assertThat(categoriaRiscoAdapter.buscarSpread(CategoriaRisco.AA)).isEqualByComparingTo("0.000830");
+        assertThat(categoriaRiscoAdapter.buscarSpread(CategoriaRisco.E)).isEqualByComparingTo("0.009489");
     }
 
     @Test

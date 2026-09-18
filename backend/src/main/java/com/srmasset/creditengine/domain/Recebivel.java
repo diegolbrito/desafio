@@ -58,18 +58,23 @@ public class Recebivel {
     }
 
     /**
-     * Prazo em dias corridos entre a data de referencia da precificacao e o vencimento.
+     * Prazo em meses inteiros entre a data de referencia da precificacao e o vencimento,
+     * usado como expoente dos juros compostos mensais (ver SPEC.md, "Premissas adotadas"
+     * item 1). Meses incompletos contam como mes inteiro (arredondamento para cima) - o
+     * mes iniciado e' cobrado por inteiro, convencao usual em desconto de recebiveis.
      * Rejeita (via excecao) recebiveis cujo vencimento nao seja estritamente posterior
      * a data de referencia.
      */
-    public long calcularPrazoDias(LocalDate dataReferencia) {
-        long prazoDias = ChronoUnit.DAYS.between(dataReferencia, dataVencimento);
-        if (prazoDias <= 0) {
+    public long calcularPrazoMeses(LocalDate dataReferencia) {
+        long mesesCompletos = ChronoUnit.MONTHS.between(dataReferencia, dataVencimento);
+        LocalDate dataAposMesesCompletos = dataReferencia.plusMonths(mesesCompletos);
+        long prazoMeses = dataAposMesesCompletos.isBefore(dataVencimento) ? mesesCompletos + 1 : mesesCompletos;
+        if (prazoMeses <= 0) {
             throw new PrazoInvalidoException(
                     "Data de vencimento (%s) deve ser posterior a data de referencia (%s)"
                             .formatted(dataVencimento, dataReferencia));
         }
-        return prazoDias;
+        return prazoMeses;
     }
 
     public void aplicarPrecificacao(ResultadoDesagio resultado) {

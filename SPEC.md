@@ -20,42 +20,40 @@ risco do ativo e na moeda de pagamento, e registrar a transação de forma audit
 
 ### 1. Fórmula de cálculo do deságio
 - Método: **desconto composto por valor presente**, padrão de precificação de ativos de renda fixa.
-- Taxa de desconto anual = `taxaBase(moeda) + spreadRisco(categoria) + custoOperacional (fixo)`.
-- Prazo: dias corridos entre a data de precificação (data de entrada do lote) e a data de vencimento do recebível. Sem calendário de dias úteis/feriados no MVP (simplificação assumida).
-- Base de dias por moeda (convenção de mercado):
-  - BRL: base **252** (convenção local, taxas prefixadas referenciadas ao CDI).
-  - USD: base **360** (convenção internacional Actual/360).
+- Taxa de desconto **mensal** = `taxaBase(moeda) + spreadRisco(categoria) + custoOperacional (fixo)` — todas as três parcelas expressas ao mês (a.m.).
+- Prazo: em **meses inteiros** entre a data de precificação (data de entrada do lote) e a data de vencimento do recebível. Mês incompleto conta como mês inteiro (arredondamento para cima — o mês iniciado é cobrado por inteiro, convenção usual em desconto de recebíveis). Sem calendário de dias úteis/feriados no MVP (simplificação assumida).
+- Juros **compostos mensais**: capitalização por mês corrido, expoente inteiro igual ao prazo em meses (sem base de dias por moeda — a distinção BRL/USD fica só na taxa base de referência de cada moeda).
 - Fórmula:
-  - `fatorDesconto = (1 + taxaDesconto) ^ (prazoDias / baseDias)`
+  - `fatorDesconto = (1 + taxaDesconto) ^ prazoMeses`
   - `valorPresente = valorBruto / fatorDesconto`
   - `deságio = valorBruto − valorPresente`
 - Precisão: cálculos intermediários em `BigDecimal` com `MathContext` de alta precisão (ex.: `DECIMAL128`); arredondamento HALF_EVEN para 2 casas decimais aplicado apenas no resultado final (`valorPresente`, `deságio`), conforme a seção "Decisões de precisão numérica".
 
 ### 2. Classificação de risco e spread
-- Categorias de risco por recebível (escala simplificada de 6 níveis, inspirada na lógica de rating de crédito de mercado):
+- Categorias de risco por recebível (escala simplificada de 6 níveis, inspirada na lógica de rating de crédito de mercado). Spreads originalmente cotados ao ano (referência de mercado) e convertidos ao equivalente mensal — `taxaMensal = (1 + taxaAnual) ^ (1/12) − 1` — para compor a taxa de desconto mensal do item 1:
 
-  | Categoria | Spread de risco (a.a.) |
-  |---|---|
-  | AA | 1,0% |
-  | A  | 2,0% |
-  | B  | 3,5% |
-  | C  | 5,5% |
-  | D  | 8,0% |
-  | E  | 12,0% |
+  | Categoria | Spread de risco (a.a. de referência) | Spread de risco aplicado (a.m.) |
+  |---|---|---|
+  | AA | 1,0%  | 0,0830% |
+  | A  | 2,0%  | 0,1652% |
+  | B  | 3,5%  | 0,2871% |
+  | C  | 5,5%  | 0,4472% |
+  | D  | 8,0%  | 0,6434% |
+  | E  | 12,0% | 0,9489% |
 
 - A categoria de risco é **informada na entrada do lote** (campo obrigatório por recebível), não é calculada/derivada de bureau externo no MVP.
 - Cadastrada em tabela de referência (`categoria_risco`), populada via migration Flyway (seed), permitindo evolução futura sem alterar código.
 
 ### 3. Taxa base e câmbio
 - Taxa base por moeda é um proxy de mercado (CDI para BRL, SOFR para USD), cadastrado em tabela de referência (`taxa_base`), com valor vigente definido via seed/migration — sem integração automática com fonte externa no MVP.
-- Valores seed assumidos: BRL = 10,65% a.a.; USD = 4,80% a.a.
+- Valores seed assumidos (referência anual, convertida ao equivalente mensal pela mesma fórmula do item 2): BRL = 10,65% a.a. → 0,8469% a.m.; USD = 4,80% a.a. → 0,3915% a.m.
 - **Câmbio (conversão BRL↔USD) não é necessário para o cálculo do deságio.** Cada recebível é precificado e permanece na sua própria moeda de origem — o fundo opera caixa segregado por moeda ("caixa multimoedas" = posições paralelas, não conversão). Conversão cambial fica fora do escopo do MVP (útil apenas para relatórios gerenciais consolidados, não implementados).
 - Taxa base e spread de risco aplicados a cada recebível são "congelados" (snapshot) no momento da precificação e registrados na transação, garantindo auditabilidade mesmo que os valores de referência mudem depois.
 
 ### 4. Entrada do lote
 - Entrada via API REST (`POST /api/v1/lotes-recebiveis`), payload com os dados do lote e a lista de recebíveis.
 - Campos do recebível: `cedente` (texto livre/referência — ver item 7), `valorBruto`, `moeda`, `dataVencimento`, `categoriaRisco`.
-- Custo operacional aplicado como spread fixo adicional (valor assumido: 0,5% a.a.), configurado na aplicação (não em banco), por ser parâmetro estável.
+- Custo operacional aplicado como spread fixo adicional (valor de referência: 0,5% a.a. → 0,0416% a.m.), configurado na aplicação (não em banco), por ser parâmetro estável.
 
 ### 5. Fluxo de aprovação
 - **Não há etapa de aprovação** (nem em lote, nem item a item) no MVP. Ao ser recebido, o lote é precificado automaticamente (síncrono, no mesmo caso de uso).

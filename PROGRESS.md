@@ -292,13 +292,16 @@ critério do usuário (ex.: revisão geral, ajustes de UX, deploy real).
   tabela de "Tipos de dados canônicos" (`numeric(19,4)`). Levada ao usuário, que decidiu manter
   **2 casas decimais** (`numeric(19,2)`) em todas as camadas. SPEC.md corrigido (tabela, exemplo de
   campo, e novo item 8 em "Premissas adotadas" registrando a decisão).
-- A fórmula de deságio exige potência com expoente fracionário (`prazoDias/baseDias`), que
-  `BigDecimal` não suporta nativamente (`pow` só aceita expoente inteiro) e que não pode ser feita
+- A fórmula de deságio exigia potência com expoente fracionário (`prazoDias/baseDias`), que
+  `BigDecimal` não suporta nativamente (`pow` só aceita expoente inteiro) e que não podia ser feita
   em `double` (SPEC proíbe `double`/`float` para dinheiro e taxas). Adicionada a biblioteca
   `ch.obermuhlner:big-math` (`BigDecimalMath.pow`), que calcula potência fracionária via
   exp/log inteiramente em `BigDecimal` com `MathContext` configurável — sem perda de precisão e
   sem usar `double`. É uma dependência puramente matemática (sem I/O/framework), portanto não
   quebra a regra do domínio não depender de infraestrutura.
+  **Superado**: ver decisão abaixo (taxa mensal / prazo em meses inteiros / juros compostos
+  mensais) — o expoente passou a ser sempre inteiro, `BigDecimal.pow(int, MathContext)` nativo
+  passou a bastar, e a dependência `big-math` foi removida do `pom.xml`.
 - Mockito emite warning de deprecação sobre self-attach de agent no JDK 25 durante os testes com
   mock (`PrecificarLoteServiceTest`). Não falha o build; é um aviso já conhecido do Mockito em
   JDKs recentes. Se incomodar futuramente, resolve-se configurando o agent explicitamente no
@@ -376,3 +379,27 @@ critério do usuário (ex.: revisão geral, ajustes de UX, deploy real).
   rodar os testes do frontend neste ambiente específico, é preciso o passo extra de copiar os
   arquivos para dentro do container antes (documentado aqui; não é necessário com Node instalado
   nativamente no host, nem em CI Linux nativo, igual ao workaround do Testcontainers na Etapa 3).
+- **Mudança de convenção da fórmula de deságio: taxa ao mês, prazo em meses inteiros, juros
+  compostos mensais** (pedido do usuário após a implementação inicial baseada em taxa anual +
+  expoente fracionário em dias corridos). Alterações:
+  - `Recebivel.calcularPrazoDias` (dias corridos) → `calcularPrazoMeses` (meses inteiros), com
+    arredondamento para cima em mês incompleto (`ChronoUnit.MONTHS.between` + verificação se a
+    data-referência + N meses ainda é anterior ao vencimento) — decisão de premissa não
+    especificada pelo negócio, documentada em SPEC.md item 1 como as demais.
+  - `Moeda.baseDias()` (BRL=252, USD=360) removido — deixou de fazer sentido sem exponenciação
+    fracionária; a distinção entre moedas continua existindo só na taxa base de referência de
+    cada uma (tabela `taxa_base`).
+  - `CalculadoraDesagio.calcular` perdeu o parâmetro `Moeda` e passou a receber `prazoMeses` (long)
+    em vez de `prazoDias`; o fator de desconto usa `BigDecimal.pow(int, MathContext)` (expoente
+    sempre inteiro), eliminando a necessidade de `BigDecimalMath.pow` — dependência `big-math`
+    removida do `pom.xml`.
+  - Taxas de referência (seed de `taxa_base` e `categoria_risco`, antes cotadas a.a.) convertidas
+    para o equivalente mensal via `taxaMensal = (1 + taxaAnual)^(1/12) − 1`, preservando o mesmo
+    significado de mercado (CDI/SOFR e spreads de risco) sob a nova convenção de capitalização.
+    Como as migrations Flyway já haviam rodado neste ambiente, os novos valores foram aplicados
+    numa migration nova (`V202609181005__ajustar_taxas_para_juros_compostos_mensais.sql`) com
+    `UPDATE`, em vez de editar as migrations de seed já existentes (regra geral do Flyway: nunca
+    alterar migration já aplicada, pois quebra o checksum de quem já rodou).
+  - Testes (`CalculadoraDesagioTest`, `RecebivelTest`, `PersistenciaIntegrationTest`) atualizados
+    para a nova assinatura/valores; `PrecificarLoteServiceTest` não precisou de mudança de
+    asserção (usa taxas mockadas diretamente, não depende de base de dias).

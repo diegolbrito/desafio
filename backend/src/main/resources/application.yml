@@ -20,10 +20,10 @@ server:
   forward-headers-strategy: framework
 
 credit-engine:
-  # Spread fixo de custo operacional (fracao decimal, a.a.) somado a taxa base +
+  # Spread fixo de custo operacional (fracao decimal, a.m.) somado a taxa base +
   # spread de risco na formula de desagio (ver SPEC.md, "Premissas adotadas" item 4).
   # Parametro estavel, por isso vive na aplicacao e nao em tabela de referencia no banco.
-  custo-operacional: ${CUSTO_OPERACIONAL:0.005}
+  custo-operacional: ${CUSTO_OPERACIONAL:0.000}
   cors:
     # Origens do frontend autorizadas a chamar a API (politica de navegador,
     # nao autenticacao). Lista separada por virgula.
