@@ -1,0 +1,234 @@
+openapi: 3.1.0
+info:
+  title: SRM Credit Engine
+  description: Motor de precificacao e registro auditavel de recebiveis adquiridos
+    pelo FIDC.
+  version: v1
+servers:
+- url: http://localhost:8080
+  description: Generated server url
+tags:
+- name: Lotes de recebiveis
+  description: "Recebimento, precificacao e consulta de lotes de recebiveis"
+paths:
+  /api/v1/lotes-recebiveis:
+    get:
+      tags:
+      - Lotes de recebiveis
+      summary: "Lista os lotes de recebiveis, paginado"
+      description: "Ordenacao por createdAt, dataReferencia ou status (formato: campo,asc|desc)."
+      operationId: listar
+      parameters:
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+          default: "createdAt,desc"
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PaginaResponseLoteRecebiveisResumoResponse"
+    post:
+      tags:
+      - Lotes de recebiveis
+      summary: Recebe e precifica um lote de recebiveis
+      description: Calcula o desagio de cada recebivel do lote e registra o resultado
+        de forma auditavel. Retorna 201 mesmo se algum recebivel for rejeitado individualmente
+        (ver campo status de cada item).
+      operationId: criar
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoteRecebiveisRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/LoteRecebiveisResponse"
+  /api/v1/lotes-recebiveis/{id}:
+    get:
+      tags:
+      - Lotes de recebiveis
+      summary: "Busca o detalhe de um lote, com seus recebiveis precificados"
+      operationId: buscarPorId
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/LoteRecebiveisResponse"
+components:
+  schemas:
+    LoteRecebiveisRequest:
+      type: object
+      properties:
+        recebiveis:
+          type: array
+          items:
+            $ref: "#/components/schemas/RecebivelRequest"
+          minItems: 1
+      required:
+      - recebiveis
+    RecebivelRequest:
+      type: object
+      properties:
+        cedente:
+          type: string
+          minLength: 1
+        valorBruto:
+          type: string
+          example: "15000.00"
+        moeda:
+          type: string
+          enum:
+          - BRL
+          - USD
+        dataVencimento:
+          type: string
+          format: date
+        categoriaRisco:
+          type: string
+          enum:
+          - AA
+          - A
+          - B
+          - C
+          - D
+          - E
+      required:
+      - categoriaRisco
+      - cedente
+      - dataVencimento
+      - moeda
+      - valorBruto
+    LoteRecebiveisResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        dataReferencia:
+          type: string
+          format: date
+        status:
+          type: string
+          enum:
+          - RECEBIDO
+          - PRECIFICADO
+          - ERRO
+        recebiveis:
+          type: array
+          items:
+            $ref: "#/components/schemas/RecebivelResponse"
+    RecebivelResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        cedente:
+          type: string
+        valorBruto:
+          type: string
+          example: "15000.00"
+        moeda:
+          type: string
+          enum:
+          - BRL
+          - USD
+        dataVencimento:
+          type: string
+          format: date
+        categoriaRisco:
+          type: string
+          enum:
+          - AA
+          - A
+          - B
+          - C
+          - D
+          - E
+        status:
+          type: string
+          enum:
+          - PENDENTE
+          - PRECIFICADO
+          - REJEITADO
+        valorPresente:
+          type: string
+          example: "14200.00"
+        valorDesagio:
+          type: string
+          example: "800.00"
+        taxaDescontoAplicada:
+          type: string
+          example: "0.146500"
+        motivoRejeicao:
+          type: string
+    LoteRecebiveisResumoResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        dataReferencia:
+          type: string
+          format: date
+        status:
+          type: string
+          enum:
+          - RECEBIDO
+          - PRECIFICADO
+          - ERRO
+        createdAt:
+          type: string
+          format: date-time
+    PaginaResponseLoteRecebiveisResumoResponse:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/LoteRecebiveisResumoResponse"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32

@@ -12,6 +12,8 @@ import com.srmasset.creditengine.application.port.in.ListarLotesRecebiveisUseCas
 import com.srmasset.creditengine.application.port.in.PrecificarLoteUseCase;
 import com.srmasset.creditengine.application.port.out.DirecaoOrdenacao;
 import com.srmasset.creditengine.domain.LoteRecebiveis;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +38,7 @@ import java.util.UUID;
  */
 @RestController
 @RequestMapping("/api/v1/lotes-recebiveis")
+@Tag(name = "Lotes de recebiveis", description = "Recebimento, precificacao e consulta de lotes de recebiveis")
 public class LoteRecebiveisController {
 
     private final PrecificarLoteUseCase precificarLoteUseCase;
@@ -52,6 +55,9 @@ public class LoteRecebiveisController {
 
     @PostMapping
     @Transactional
+    @Operation(summary = "Recebe e precifica um lote de recebiveis",
+            description = "Calcula o desagio de cada recebivel do lote e registra o resultado de forma auditavel. "
+                    + "Retorna 201 mesmo se algum recebivel for rejeitado individualmente (ver campo status de cada item).")
     public ResponseEntity<LoteRecebiveisResponse> criar(@Valid @RequestBody LoteRecebiveisRequest request,
                                                           UriComponentsBuilder uriBuilder) {
         ComandoPrecificarLote comando = paraComando(request);
@@ -62,6 +68,8 @@ public class LoteRecebiveisController {
     }
 
     @GetMapping
+    @Operation(summary = "Lista os lotes de recebiveis, paginado",
+            description = "Ordenacao por createdAt, dataReferencia ou status (formato: campo,asc|desc).")
     public PaginaResponse<LoteRecebiveisResumoResponse> listar(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
@@ -77,6 +85,7 @@ public class LoteRecebiveisController {
     }
 
     @GetMapping("/{id}")
+    @Operation(summary = "Busca o detalhe de um lote, com seus recebiveis precificados")
     public LoteRecebiveisResponse buscarPorId(@PathVariable UUID id) {
         return buscarLoteUseCase.buscarPorId(id)
                 .map(LoteRecebiveisResponse::from)
