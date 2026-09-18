@@ -5,7 +5,7 @@ Decisões de negócio/arquitetura ficam registradas em `SPEC.md` (seção "Premi
 ficam apenas decisões técnicas pontuais tomadas durante a construção.
 
 ## Status geral
-Etapa 5 (OpenAPI) concluída. Próxima: Etapa 6 (frontend scaffolding).
+Etapa 6 (frontend scaffolding) concluída. Próxima: Etapa 7 (feature lotes-recebiveis no frontend).
 
 ## Concluído
 - [x] SPEC.md revisado; seção "Premissas adotadas" preenchida (fórmula de deságio, categorias de
@@ -167,10 +167,35 @@ Etapa 5 (OpenAPI) concluída. Próxima: Etapa 6 (frontend scaffolding).
     mais adiante — não fiz agora para não adicionar complexidade de build sem necessidade imediata
     (a Etapa 6 só precisa do arquivo existir, não que ele seja gerado automaticamente).
   - `mvn test` → 33/33 verdes (sem mudança nos testes, só validação manual do schema exportado).
+- [x] Etapa 6 — Frontend scaffolding (`frontend/`):
+  - Vite 8 + React 19.3 + TypeScript 5.9 (estrito). `package.json` com scripts `dev`, `build`
+    (`tsc --noEmit && vite build`), `lint`, `format`, `test` (Vitest), `generate:api-types`
+    (`openapi-typescript` lendo `../openapi.yaml`).
+  - ESLint 10 (flat config, `eslint.config.js`) com `typescript-eslint`, `react-hooks`,
+    `react-refresh`; Prettier configurado. `npm run lint` limpo (0 warnings).
+  - Estrutura por feature conforme SPEC: `src/features/lotes-recebiveis/pages/` (placeholder de
+    scaffolding — a feature de verdade é a Etapa 7), `src/shared/api` (`httpClient.ts` — único
+    ponto de acesso a rede, nenhum componente chama `fetch` direto — e `schema.d.ts`, gerado, não
+    escrito à mão), `src/shared/test` (setup do Vitest), `src/routes` (rotas em um único lugar,
+    com lazy loading — `React.lazy` + `Suspense`).
+  - TanStack Query (`QueryClientProvider`) e `react-router-dom` (`createBrowserRouter`) plugados
+    em `main.tsx`. `VITE_API_BASE_URL` via `.env` (nunca hardcoded — `.env.example` documenta a
+    variável).
+  - Teste de exemplo (`LotesRecebiveisPage.test.tsx`, Vitest + Testing Library) validando o setup
+    de testes end a end.
+  - Build validado: bundle inicial 336,90 kB (105,70 kB gzip) — dentro do orçamento de 500 KB do
+    SPEC — com a página lazy-loaded em chunk separado (0,26 kB). Dev server (`npm run dev`)
+    testado manualmente via `curl`, HMR ativo.
+  - **Achados de ambiente (documentados em detalhe na seção de decisões técnicas abaixo)**:
+    TypeScript 7 (a versão mais nova, reescrita em Go) ainda não é suportado por `openapi-typescript`
+    nem por outras ferramentas do ecossistema — usei TypeScript 5.9.3 (estável) no projeto todo;
+    Vitest trava indefinidamente ("Timeout waiting for worker to respond") quando os arquivos
+    estão em bind mount cross-OS (Windows→container Linux) — só `npm test` é afetado (lint e build
+    funcionam normalmente via bind mount); e `tsc -b` com project references exigia emit e gerava
+    `vite.config.js`/`.d.ts` indesejados — resolvido simplificando para um único `tsconfig.json`
+    (sem `composite`/`references`) e `tsc --noEmit` no lugar de `tsc -b`.
 
 ## Pendente (próximas etapas)
-- [ ] Etapa 6 — Frontend scaffolding (Vite + React 19.3 + TS, ESLint/Prettier, tipos gerados do
-      OpenAPI, client HTTP + TanStack Query).
 - [ ] Etapa 7 — Feature `lotes-recebiveis` no frontend (formulário RHF+Zod, listagem paginada,
       detalhe do lote) + testes de componentes/hooks.
 - [ ] Etapa 8 — `docker-compose.yml` completo (db + backend + frontend) + validação end-to-end
@@ -253,3 +278,28 @@ Etapa 5 (OpenAPI) concluída. Próxima: Etapa 6 (frontend scaffolding).
 - `HttpStatus.UNPROCESSABLE_ENTITY` foi depreciado no Spring 7 em favor de
   `HttpStatus.UNPROCESSABLE_CONTENT` (RFC 9110 renomeou a reason phrase do 422); usado no
   `GlobalExceptionHandler`.
+- **TypeScript 7 (reescrita nativa/Go) ainda quebra ferramentas do ecossistema.** Ao tentar usar
+  `typescript@^7.0.2` (a versão mais recente disponível), `openapi-typescript` falhava em runtime
+  com `TypeError: Cannot read properties of undefined (reading 'createKeywordTypeNode')` — o
+  pacote acessa `ts.factory`, que não existe mais (ou mudou de forma) na API pública do TS7. Um
+  `npm overrides` isolando uma cópia de `typescript@^5.7` só para `openapi-typescript` não
+  resolveu (o npm não criou a cópia aninhada, provavelmente por já haver uma versão direta no
+  projeto). A solução foi usar `typescript@^5.9.3` (estável) no projeto inteiro — mais simples e
+  garante compatibilidade com toda a cadeia de ferramentas (Vite, Vitest, ESLint, `typescript-eslint`,
+  `openapi-typescript`). Vale reavaliar quando o ecossistema acompanhar o TS7.
+- **`tsc -b` (project references) exige que o projeto referenciado emita algo** — não é possível
+  ter `"noEmit": true` num projeto `composite` que é alvo de `references`. Isso gerava
+  `vite.config.js`/`vite.config.d.ts` (compilados a partir de `vite.config.ts`) soltos na raiz do
+  `frontend/`, poluindo o diretório. Resolvido eliminando o `tsconfig.node.json` separado e usando
+  um único `tsconfig.json` (sem `composite`/`references`) cobrindo `src` e `vite.config.ts`, com
+  `tsc --noEmit` no script de build em vez de `tsc -b`.
+- **Vitest trava com bind mount cross-OS (Windows→Linux) no Docker Desktop.** `npm test` ficava
+  preso por 60s com `Error: [vitest-pool]: Failed to start forks worker ... Timeout waiting for
+  worker to respond`, tanto com o pool padrão (`forks`) quanto com `pool: 'threads'` — ou seja, não
+  é um problema do mecanismo de pool escolhido, é o bind mount em si. Confirmado copiando os
+  arquivos para o filesystem nativo do container antes de rodar (`cp -r /appmnt /native && cd
+  /native && npm test`): os testes passam em <1s. `npm run lint` e `npm run build` funcionam
+  normalmente via bind mount direto — só a inicialização do worker do Vitest é afetada. Para
+  rodar os testes do frontend neste ambiente específico, é preciso o passo extra de copiar os
+  arquivos para dentro do container antes (documentado aqui; não é necessário com Node instalado
+  nativamente no host, nem em CI Linux nativo, igual ao workaround do Testcontainers na Etapa 3).
