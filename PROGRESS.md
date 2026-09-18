@@ -5,7 +5,7 @@ Decisões de negócio/arquitetura ficam registradas em `SPEC.md` (seção "Premi
 ficam apenas decisões técnicas pontuais tomadas durante a construção.
 
 ## Status geral
-Etapa 4 (REST) concluída. Próxima: Etapa 5 (OpenAPI).
+Etapa 5 (OpenAPI) concluída. Próxima: Etapa 6 (frontend scaffolding).
 
 ## Concluído
 - [x] SPEC.md revisado; seção "Premissas adotadas" preenchida (fórmula de deságio, categorias de
@@ -142,9 +142,33 @@ Etapa 4 (REST) concluída. Próxima: Etapa 5 (OpenAPI).
     `mvn spring-boot:run`) e `curl` contra os 4 endpoints (POST feliz, GET detalhe, GET lista,
     404, 400) — todas as respostas conferidas manualmente, formatação RFC 9457 e correlation id
     presentes.
+- [x] Etapa 5 — OpenAPI (springdoc):
+  - `springdoc-openapi-starter-webmvc-ui:3.1.1` (linha 3.x, compatível com Spring Boot 4.1/Spring
+    Framework 7 — a linha 2.x é para Boot 3.x). Expõe `/v3/api-docs` (json/yaml) e
+    `/swagger-ui/index.html` sem configuração adicional.
+  - `OpenApiConfig`: metadados básicos (título, descrição, versão). `@Tag`/`@Operation` no
+    `LoteRecebiveisController` para descrições legíveis no Swagger UI.
+  - **Achado importante**: o swagger-core trata `BigDecimal` como tipo primitivo "number" por
+    padrão, mesmo a API serializando esses campos como string (customização do `JacksonConfig`,
+    Etapa 4). Sem correção, o schema OpenAPI mentiria sobre o formato real, e a geração de tipos
+    do frontend na Etapa 6 (`openapi-typescript`) produziria `number` onde deveria ser `string`,
+    quebrando a regra do SPEC de que dinheiro/taxa nunca é `number` no TS. Tentei primeiro um
+    `ModelConverter` global (mais DRY), mas não funciona para `BigDecimal`: o swagger-core resolve
+    tipos "primitive-like" (`BigDecimal`, `BigInteger`) via uma tabela interna (`PrimitiveType`)
+    antes da chain de converters rodar, então um converter customizado nunca é chamado para esse
+    tipo. A solução correta e documentada é anotar cada campo `BigDecimal` com
+    `@Schema(type = "string", example = "...")` nos DTOs de request/response — mais repetitivo,
+    mas é o jeito que realmente funciona.
+  - Spec exportada manualmente para `openapi.yaml` na raiz do repo (via `curl
+    localhost:8080/v3/api-docs.yaml` com a app rodando de verdade). **Não há geração automática no
+    build ainda** — para regenerar depois de mudar a API: subir `docker compose up -d db` +
+    `mvn spring-boot:run`, depois `curl -o openapi.yaml localhost:8080/v3/api-docs.yaml`. Se
+    valer a pena automatizar isso (ex.: via `springdoc-openapi-maven-plugin`), fica para decidir
+    mais adiante — não fiz agora para não adicionar complexidade de build sem necessidade imediata
+    (a Etapa 6 só precisa do arquivo existir, não que ele seja gerado automaticamente).
+  - `mvn test` → 33/33 verdes (sem mudança nos testes, só validação manual do schema exportado).
 
 ## Pendente (próximas etapas)
-- [ ] Etapa 5 — OpenAPI exportado (springdoc).
 - [ ] Etapa 6 — Frontend scaffolding (Vite + React 19.3 + TS, ESLint/Prettier, tipos gerados do
       OpenAPI, client HTTP + TanStack Query).
 - [ ] Etapa 7 — Feature `lotes-recebiveis` no frontend (formulário RHF+Zod, listagem paginada,

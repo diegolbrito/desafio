@@ -5,15 +5,24 @@ import com.srmasset.creditengine.domain.CategoriaRisco;
 import com.srmasset.creditengine.domain.Moeda;
 import com.srmasset.creditengine.domain.Recebivel;
 import com.srmasset.creditengine.domain.StatusRecebivel;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
 
-public record RecebivelResponse(UUID id, String cedente, BigDecimal valorBruto, Moeda moeda,
-                                 LocalDate dataVencimento, CategoriaRisco categoriaRisco,
-                                 StatusRecebivel status, BigDecimal valorPresente,
-                                 BigDecimal valorDesagio, BigDecimal taxaDescontoAplicada,
+/**
+ * Campos BigDecimal levam {@code @Schema(type = "string")}: o swagger-core trata
+ * BigDecimal como "number" por padrao, mas a API serializa como string (ver
+ * JacksonConfig e SPEC.md, "Tipos de dados canonicos").
+ */
+public record RecebivelResponse(UUID id, String cedente,
+                                 @Schema(type = "string", example = "15000.00") BigDecimal valorBruto,
+                                 Moeda moeda, LocalDate dataVencimento, CategoriaRisco categoriaRisco,
+                                 StatusRecebivel status,
+                                 @Schema(type = "string", example = "14200.00") BigDecimal valorPresente,
+                                 @Schema(type = "string", example = "800.00") BigDecimal valorDesagio,
+                                 @Schema(type = "string", example = "0.146500") BigDecimal taxaDescontoAplicada,
                                  String motivoRejeicao) {
 
     public static RecebivelResponse from(Recebivel recebivel) {
