@@ -15,6 +15,9 @@ spring:
 
 server:
   port: ${SERVER_PORT:8080}
+  # Respeita X-Forwarded-* (porta/proto) do nginx do frontend, senao o header
+  # Location de um 201 fica com a porta interna do container, nao a publica.
+  forward-headers-strategy: framework
 
 credit-engine:
   # Spread fixo de custo operacional (fracao decimal, a.a.) somado a taxa base +
