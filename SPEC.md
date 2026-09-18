@@ -69,6 +69,10 @@ risco do ativo e na moeda de pagamento, e registrar a transação de forma audit
 ### 7. Cadastro de cedente
 - Cedente é um campo de referência (texto) no recebível, **sem entidade/cadastro próprio** no MVP.
 
+### 8. Escala decimal de valores monetários
+- A seção "Decisões de precisão numérica" (2 casas decimais) e a tabela "Tipos de dados canônicos" (`numeric(19,2)`) estavam em contradição. Decisão: prevalece **2 casas decimais** (`numeric(19,2)`) para todo valor monetário, em todas as camadas — inclusive `valorPresente` e `deságio` calculados. A tabela de tipos canônicos e o exemplo de campo foram corrigidos para `numeric(19,2)` / `"15000.00"`.
+- Cálculos intermediários usam `BigDecimal` com `MathContext` de alta precisão (sem arredondar); o arredondamento HALF_EVEN para 2 casas ocorre apenas ao fixar o resultado final (`valorPresente`, `deságio`) antes de persistir/retornar.
+
 ## Decisões de precisão numérica
 
 - Banco de dados: Campos monetários devem usar o tipo `DECIMAL`
@@ -119,7 +123,7 @@ risco do ativo e na moeda de pagamento, e registrar a transação de forma audit
 | Tipo de dado      | PostgreSQL       | Java              | JSON                     | React/TS          |
 |-------------------|------------------|-------------------|--------------------------|-------------------|
 | Identificador     | `uuid`           | `UUID`            | string                   | `string`          |
-| Valor monetário   | `numeric(19,4)`  | `BigDecimal`      | string `"1234.56"`     | `string` (formatar só na exibição) |
+| Valor monetário   | `numeric(19,2)`  | `BigDecimal`      | string `"1234.56"`     | `string` (formatar só na exibição) |
 | Taxa / percentual | `numeric(9,6)`   | `BigDecimal`      | string (fração decimal, `"0.02"`) | `string` |
 | Moeda             | `char(3)`        | `enum Moeda`      | `"BRL"` / `"USD"`        | `'BRL' \| 'USD'`   |
 | Data              | `date`           | `LocalDate`       | `"2026-09-17"`           | `string`          |
@@ -159,9 +163,9 @@ risco do ativo e na moeda de pagamento, e registrar a transação de forma audit
 
 ### Exemplo completo de um campo (referência)
 Campo "valor bruto do recebível":
-- DB: `recebivel.valor_bruto numeric(19,4) not null check (valor_bruto > 0)`
+- DB: `recebivel.valor_bruto numeric(19,2) not null check (valor_bruto > 0)`
 - Java: `private BigDecimal valorBruto;` + `@NotNull @Positive` no DTO
-- JSON: `"valorBruto": "15000.0000"`
+- JSON: `"valorBruto": "15000.00"`
 - TS: `valorBruto: string` → exibido como `R$ 15.000,00`
 
 ## Arquitetura Backend e decisões

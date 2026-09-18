@@ -5,12 +5,12 @@ Decisões de negócio/arquitetura ficam registradas em `SPEC.md` (seção "Premi
 ficam apenas decisões técnicas pontuais tomadas durante a construção.
 
 ## Status geral
-Etapa 0 (scaffolding) concluída. Próxima: Etapa 1 (domínio puro).
+Etapa 1 (domínio puro) concluída. Próxima: Etapa 2 (aplicação).
 
 ## Concluído
 - [x] SPEC.md revisado; seção "Premissas adotadas" preenchida (fórmula de deságio, categorias de
       risco/spread, taxa base/câmbio, entrada de lote via API, fluxo sem aprovação, escopo sem
-      liquidação, cedente sem cadastro próprio).
+      liquidação, cedente sem cadastro próprio, escala decimal de 2 casas).
 - [x] Etapa 0 — Scaffolding:
   - Estrutura de pastas do backend (hexagonal: `domain`, `application`, `adapter/in/web`,
     `adapter/out/persistence`, `config`) e placeholder de `frontend/`.
@@ -23,11 +23,25 @@ Etapa 0 (scaffolding) concluída. Próxima: Etapa 1 (domínio puro).
     (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`), `ddl-auto: validate` (schema só
     via Flyway), Flyway apontando para `classpath:db/migration`.
   - Classe de entrada `CreditEngineApplication` (composição, sem lógica).
+- [x] Etapa 1 — Domínio puro (pacote `domain`, zero dependência de framework):
+  - Enums `Moeda` (com `baseDias()`: BRL=252, USD=360), `CategoriaRisco` (AA..E), `StatusLote`,
+    `StatusRecebivel`.
+  - `Recebivel` (entidade): invariantes estruturais na criação, `calcularPrazoDias` (rejeita
+    vencimento não posterior à data de referência via `PrazoInvalidoException`),
+    `aplicarPrecificacao`/`rejeitar` como transições de estado.
+  - `LoteRecebiveis` (agregado raiz): valida lista não vazia, `marcarPrecificado`/`marcarErro`.
+  - `CalculadoraDesagio`: implementa a fórmula de desconto composto por valor presente definida
+    no SPEC — usa `BigDecimal`/`MathContext.DECIMAL128` para os cálculos intermediários e
+    arredonda HALF_EVEN só no resultado final (`valorPresente`, `valorDesagio`); deságio é
+    derivado por subtração dos valores já arredondados, garantindo
+    `valorPresente + valorDesagio == valorBruto` sempre.
+  - Exceções de domínio: `DomainException` (base), `RecebivelInvalidoException`,
+    `LoteRecebiveisInvalidoException`, `PrazoInvalidoException`.
+  - 19 testes unitários (JUnit5 + AssertJ, sem Spring) cobrindo fórmula (BRL/USD, casos
+    verificáveis manualmente, invariante valorPresente+deságio=valorBruto, arredondamento) e
+    invariantes/transições de `Recebivel`/`LoteRecebiveis`. `mvn test` → 19/19 verdes.
 
 ## Pendente (próximas etapas)
-- [ ] Etapa 1 — Domínio puro: enums (`Moeda`, `CategoriaRisco`, `StatusLote`, `StatusRecebivel`),
-      value objects, `CalculadoraDeságio` (fórmula definida em SPEC.md), exceções de domínio +
-      testes unitários (sem Spring).
 - [ ] Etapa 2 — Aplicação: ports de entrada/saída, `PrecificarLoteService` + testes com mocks.
 - [ ] Etapa 3 — Persistência: migrations Flyway (`lote_recebivel`, `recebivel`, `categoria_risco`
       seed, `taxa_base` seed, `transacao_evento` append-only), entidades JPA, repositories +
@@ -55,3 +69,16 @@ Etapa 0 (scaffolding) concluída. Próxima: Etapa 1 (domínio puro).
 - Postgres 18 mudou a convenção de diretório de dados (requer o volume montado em
   `/var/lib/postgresql`, não mais em `/var/lib/postgresql/data`). `docker-compose.yml` ajustado
   para o novo layout; validado com `docker compose up -d db` (healthcheck `healthy`).
+- Identidade git configurada localmente neste repo (`git config user.name/email`, escopo local,
+  confirmada com o usuário) para permitir commits, já que o ambiente não tinha nenhuma configurada.
+- Contradição encontrada no SPEC.md entre "Decisões de precisão numérica" (2 casas decimais) e a
+  tabela de "Tipos de dados canônicos" (`numeric(19,4)`). Levada ao usuário, que decidiu manter
+  **2 casas decimais** (`numeric(19,2)`) em todas as camadas. SPEC.md corrigido (tabela, exemplo de
+  campo, e novo item 8 em "Premissas adotadas" registrando a decisão).
+- A fórmula de deságio exige potência com expoente fracionário (`prazoDias/baseDias`), que
+  `BigDecimal` não suporta nativamente (`pow` só aceita expoente inteiro) e que não pode ser feita
+  em `double` (SPEC proíbe `double`/`float` para dinheiro e taxas). Adicionada a biblioteca
+  `ch.obermuhlner:big-math` (`BigDecimalMath.pow`), que calcula potência fracionária via
+  exp/log inteiramente em `BigDecimal` com `MathContext` configurável — sem perda de precisão e
+  sem usar `double`. É uma dependência puramente matemática (sem I/O/framework), portanto não
+  quebra a regra do domínio não depender de infraestrutura.
