@@ -8,6 +8,7 @@ import com.srmasset.creditengine.application.port.out.RegistrarEventoTransacaoPo
 import com.srmasset.creditengine.application.port.out.SalvarLoteRecebiveisPort;
 import com.srmasset.creditengine.application.port.out.TaxaBaseRepositoryPort;
 import com.srmasset.creditengine.domain.CalculadoraDesagio;
+import com.srmasset.creditengine.domain.ConversorCambial;
 import com.srmasset.creditengine.domain.EventoTransacao;
 import com.srmasset.creditengine.domain.LoteRecebiveis;
 import com.srmasset.creditengine.domain.Recebivel;
@@ -31,6 +32,7 @@ import java.util.List;
 public class PrecificarLoteService implements PrecificarLoteUseCase {
 
     private final CalculadoraDesagio calculadora = new CalculadoraDesagio();
+    private final ConversorCambial conversorCambial = new ConversorCambial();
 
     private final TaxaBaseRepositoryPort taxaBaseRepository;
     private final CategoriaRiscoRepositoryPort categoriaRiscoRepository;
@@ -58,7 +60,8 @@ public class PrecificarLoteService implements PrecificarLoteUseCase {
         LocalDate dataReferencia = LocalDate.now(clock);
 
         List<Recebivel> recebiveis = comando.recebiveis().stream()
-                .map(r -> Recebivel.criar(r.cedente(), r.valorBruto(), r.moeda(), r.dataVencimento(), r.categoriaRisco()))
+                .map(r -> Recebivel.criar(r.cedente(), r.valorBruto(), r.moeda(), r.dataVencimento(), r.categoriaRisco(),
+                        r.moedaPagamento(), r.cotacaoCambio()))
                 .toList();
 
         LoteRecebiveis lote = LoteRecebiveis.criar(dataReferencia, recebiveis);
@@ -87,6 +90,8 @@ public class PrecificarLoteService implements PrecificarLoteUseCase {
             ResultadoDesagio resultado = calculadora.calcular(
                     recebivel.getValorBruto(), prazoMeses,
                     taxaBase, spreadRisco, custoOperacionalPadrao);
+            resultado = conversorCambial.converter(resultado, recebivel.getValorBruto(),
+                    recebivel.getMoeda(), recebivel.getMoedaPagamento(), recebivel.getCotacaoCambio());
             recebivel.aplicarPrecificacao(resultado);
         } catch (PrazoInvalidoException e) {
             recebivel.rejeitar(e.getMessage());

@@ -26,6 +26,44 @@ class RecebivelTest {
     }
 
     @Test
+    void semMoedaPagamentoInformadaAssumeAPropriaMoedaSemCotacao() {
+        Recebivel recebivel = recebivelValido();
+
+        assertThat(recebivel.getMoedaPagamento()).isEqualTo(Moeda.BRL);
+        assertThat(recebivel.getCotacaoCambio()).isNull();
+    }
+
+    @Test
+    void aceitaCrossCurrencyComCotacaoPositiva() {
+        Recebivel recebivel = Recebivel.criar("Cedente", new BigDecimal("1000.00"), Moeda.BRL,
+                LocalDate.of(2026, 12, 31), CategoriaRisco.B, Moeda.USD, new BigDecimal("5.20"));
+
+        assertThat(recebivel.getMoedaPagamento()).isEqualTo(Moeda.USD);
+        assertThat(recebivel.getCotacaoCambio()).isEqualByComparingTo("5.20");
+    }
+
+    @Test
+    void rejeitaCrossCurrencySemCotacao() {
+        assertThatThrownBy(() -> Recebivel.criar("Cedente", new BigDecimal("1000.00"), Moeda.BRL,
+                LocalDate.of(2026, 12, 31), CategoriaRisco.B, Moeda.USD, null))
+                .isInstanceOf(RecebivelInvalidoException.class);
+    }
+
+    @Test
+    void rejeitaCrossCurrencyComCotacaoNaoPositiva() {
+        assertThatThrownBy(() -> Recebivel.criar("Cedente", new BigDecimal("1000.00"), Moeda.BRL,
+                LocalDate.of(2026, 12, 31), CategoriaRisco.B, Moeda.USD, BigDecimal.ZERO))
+                .isInstanceOf(RecebivelInvalidoException.class);
+    }
+
+    @Test
+    void rejeitaCotacaoInformadaQuandoMoedaPagamentoEIgualAMoeda() {
+        assertThatThrownBy(() -> Recebivel.criar("Cedente", new BigDecimal("1000.00"), Moeda.BRL,
+                LocalDate.of(2026, 12, 31), CategoriaRisco.B, Moeda.BRL, new BigDecimal("5.20")))
+                .isInstanceOf(RecebivelInvalidoException.class);
+    }
+
+    @Test
     void rejeitaValorBrutoNaoPositivo() {
         assertThatThrownBy(() -> Recebivel.criar("Cedente", new BigDecimal("0.00"), Moeda.BRL,
                 LocalDate.of(2026, 12, 31), CategoriaRisco.A))

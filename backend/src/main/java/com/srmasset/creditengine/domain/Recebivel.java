@@ -20,6 +20,8 @@ public class Recebivel {
     private final Moeda moeda;
     private final LocalDate dataVencimento;
     private final CategoriaRisco categoriaRisco;
+    private final Moeda moedaPagamento;
+    private final BigDecimal cotacaoCambio;
 
     private StatusRecebivel status;
     private BigDecimal valorPresente;
@@ -27,18 +29,33 @@ public class Recebivel {
     private BigDecimal taxaDescontoAplicada;
     private String motivoRejeicao;
 
-    private Recebivel(String cedente, BigDecimal valorBruto, Moeda moeda,
-                       LocalDate dataVencimento, CategoriaRisco categoriaRisco) {
+    private Recebivel(String cedente, BigDecimal valorBruto, Moeda moeda, LocalDate dataVencimento,
+                       CategoriaRisco categoriaRisco, Moeda moedaPagamento, BigDecimal cotacaoCambio) {
         this.cedente = cedente;
         this.valorBruto = valorBruto;
         this.moeda = moeda;
         this.dataVencimento = dataVencimento;
         this.categoriaRisco = categoriaRisco;
+        this.moedaPagamento = moedaPagamento;
+        this.cotacaoCambio = cotacaoCambio;
         this.status = StatusRecebivel.PENDENTE;
     }
 
     public static Recebivel criar(String cedente, BigDecimal valorBruto, Moeda moeda,
                                    LocalDate dataVencimento, CategoriaRisco categoriaRisco) {
+        return criar(cedente, valorBruto, moeda, dataVencimento, categoriaRisco, moeda, null);
+    }
+
+    /**
+     * @param moedaPagamento moeda em que o recebivel e' efetivamente pago; se {@code null},
+     *                       assume a propria {@code moeda} do titulo (sem cross-currency).
+     * @param cotacaoCambio  cotacao "quantidade de BRL por 1 USD" (ver SPEC.md, "Premissas
+     *                       adotadas" item 3); obrigatoria e positiva quando moedaPagamento
+     *                       difere de moeda, e nao deve ser informada quando sao iguais.
+     */
+    public static Recebivel criar(String cedente, BigDecimal valorBruto, Moeda moeda,
+                                   LocalDate dataVencimento, CategoriaRisco categoriaRisco,
+                                   Moeda moedaPagamento, BigDecimal cotacaoCambio) {
         if (cedente == null || cedente.isBlank()) {
             throw new RecebivelInvalidoException("Cedente e obrigatorio");
         }
@@ -54,7 +71,19 @@ public class Recebivel {
         if (categoriaRisco == null) {
             throw new RecebivelInvalidoException("Categoria de risco e obrigatoria");
         }
-        return new Recebivel(cedente, valorBruto, moeda, dataVencimento, categoriaRisco);
+        Moeda moedaPagamentoResolvida = moedaPagamento == null ? moeda : moedaPagamento;
+        if (moedaPagamentoResolvida != moeda) {
+            if (cotacaoCambio == null || cotacaoCambio.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new RecebivelInvalidoException(
+                        "Cotacao de cambio e obrigatoria e deve ser positiva quando a moeda de pagamento (%s) difere da moeda do titulo (%s)"
+                                .formatted(moedaPagamentoResolvida, moeda));
+            }
+        } else if (cotacaoCambio != null) {
+            throw new RecebivelInvalidoException(
+                    "Cotacao de cambio nao deve ser informada quando a moeda de pagamento e igual a moeda do titulo");
+        }
+        return new Recebivel(cedente, valorBruto, moeda, dataVencimento, categoriaRisco,
+                moedaPagamentoResolvida, cotacaoCambio);
     }
 
     /**
@@ -124,6 +153,14 @@ public class Recebivel {
 
     public CategoriaRisco getCategoriaRisco() {
         return categoriaRisco;
+    }
+
+    public Moeda getMoedaPagamento() {
+        return moedaPagamento;
+    }
+
+    public BigDecimal getCotacaoCambio() {
+        return cotacaoCambio;
     }
 
     public StatusRecebivel getStatus() {

@@ -70,6 +70,14 @@ public class RecebivelEntity {
     @Column(name = "motivo_rejeicao", length = 500)
     private String motivoRejeicao;
 
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.CHAR)
+    @Column(name = "moeda_pagamento", nullable = false, columnDefinition = "char(3)")
+    private Moeda moedaPagamento;
+
+    @Column(name = "cotacao_cambio")
+    private BigDecimal cotacaoCambio;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
@@ -91,7 +99,8 @@ public class RecebivelEntity {
     public RecebivelEntity(String cedente, BigDecimal valorBruto, Moeda moeda, LocalDate dataVencimento,
                             CategoriaRisco categoriaRisco, StatusRecebivel status,
                             BigDecimal valorPresente, BigDecimal valorDesagio,
-                            BigDecimal taxaDescontoAplicada, String motivoRejeicao) {
+                            BigDecimal taxaDescontoAplicada, String motivoRejeicao,
+                            Moeda moedaPagamento, BigDecimal cotacaoCambio) {
         this.cedente = cedente;
         this.valorBruto = valorBruto;
         this.moeda = moeda;
@@ -102,6 +111,8 @@ public class RecebivelEntity {
         this.valorDesagio = valorDesagio;
         this.taxaDescontoAplicada = taxaDescontoAplicada;
         this.motivoRejeicao = motivoRejeicao;
+        this.moedaPagamento = moedaPagamento;
+        this.cotacaoCambio = cotacaoCambio;
     }
 
     void atribuirLoteRecebivel(LoteRecebivelEntity loteRecebivel) {
@@ -150,5 +161,13 @@ public class RecebivelEntity {
 
     public String getMotivoRejeicao() {
         return motivoRejeicao;
+    }
+
+    public Moeda getMoedaPagamento() {
+        return moedaPagamento;
+    }
+
+    public BigDecimal getCotacaoCambio() {
+        return cotacaoCambio;
     }
 }

@@ -26,9 +26,12 @@ public record EventoTransacao(TipoEventoTransacao tipo, UUID loteId, UUID recebi
     }
 
     public static EventoTransacao recebivelPrecificado(UUID loteId, Recebivel recebivel, OffsetDateTime agora) {
+        String cambio = recebivel.getMoedaPagamento() == recebivel.getMoeda()
+                ? ""
+                : ", moedaPagamento=%s, cotacaoCambio=%s".formatted(recebivel.getMoedaPagamento(), recebivel.getCotacaoCambio());
         return new EventoTransacao(TipoEventoTransacao.RECEBIVEL_PRECIFICADO, loteId, recebivel.getId(),
-                "Recebivel precificado: valorPresente=%s, valorDesagio=%s, taxaDescontoAplicada=%s".formatted(
-                        recebivel.getValorPresente(), recebivel.getValorDesagio(), recebivel.getTaxaDescontoAplicada()),
+                "Recebivel precificado: valorPresente=%s, valorDesagio=%s, taxaDescontoAplicada=%s%s".formatted(
+                        recebivel.getValorPresente(), recebivel.getValorDesagio(), recebivel.getTaxaDescontoAplicada(), cambio),
                 agora);
     }
 

@@ -21,6 +21,12 @@ import java.time.LocalDate;
  * serializa dinheiro/taxas como string (ver JacksonConfig e SPEC.md, "Tipos de
  * dados canonicos") - sem a anotacao, o schema OpenAPI ficaria errado e a geracao
  * de tipos do frontend (Etapa 6) produziria "number" em vez de "string".
+ *
+ * <p>{@code moedaPagamento}/{@code cotacaoCambio} sao opcionais: quando omitidos (ou
+ * quando moedaPagamento == moeda), nao ha conversao cambial. Quando moedaPagamento
+ * difere de moeda (cross-currency), cotacaoCambio e' obrigatoria - validado no
+ * dominio (Recebivel.criar), nao aqui, pois e' uma regra cruzada entre dois campos
+ * (ver SPEC.md, "Premissas adotadas" item 3).
  */
 public record RecebivelRequest(
         @NotBlank(message = "Cedente e obrigatorio") String cedente,
@@ -28,5 +34,12 @@ public record RecebivelRequest(
         @Schema(type = "string", example = "15000.00") BigDecimal valorBruto,
         @NotNull(message = "Moeda e obrigatoria") Moeda moeda,
         @NotNull(message = "Data de vencimento e obrigatoria") LocalDate dataVencimento,
-        @NotNull(message = "Categoria de risco e obrigatoria") CategoriaRisco categoriaRisco) {
+        @NotNull(message = "Categoria de risco e obrigatoria") CategoriaRisco categoriaRisco,
+        @Schema(description = "Moeda em que o recebivel e' efetivamente pago, se diferente de `moeda` "
+                + "(cross-currency). Omitir quando o pagamento e' na propria moeda do titulo.")
+        Moeda moedaPagamento,
+        @Positive(message = "Cotacao de cambio deve ser positiva")
+        @Schema(type = "string", example = "5.20", description = "Quantidade de BRL por 1 USD. Obrigatoria "
+                + "quando moedaPagamento difere de moeda; nao deve ser informada quando sao iguais.")
+        BigDecimal cotacaoCambio) {
 }

@@ -403,3 +403,28 @@ critério do usuário (ex.: revisão geral, ajustes de UX, deploy real).
   - Testes (`CalculadoraDesagioTest`, `RecebivelTest`, `PersistenciaIntegrationTest`) atualizados
     para a nova assinatura/valores; `PrecificarLoteServiceTest` não precisou de mudança de
     asserção (usa taxas mockadas diretamente, não depende de base de dias).
+- **Câmbio cross-currency (título numa moeda, pagamento em outra)** adicionado a pedido do usuário,
+  revertendo a premissa anterior de que câmbio "não é necessário" (SPEC.md item 3). Pontos-chave:
+  - `Recebivel` ganha `moedaPagamento`/`cotacaoCambio` (novo overload de `criar`, o de 5 args
+    delega para ele com `moedaPagamento=moeda`, sem quebrar os call sites existentes). Validação
+    cruzada no domínio: cotação obrigatória e positiva quando as moedas diferem, proibida quando
+    são iguais.
+  - Nova classe de domínio `ConversorCambial`: converte `ResultadoDesagio` **ao final** do cálculo
+    de deságio (que continua 100% na moeda do título). Convenção assumida: `cotacaoCambio` é
+    sempre "BRL por 1 USD", independente de qual moeda é o título — simplificação só válida com
+    duas moedas. O deságio convertido é derivado por subtração após arredondamento (mesma técnica
+    do item 1), preservando o invariante `valorPresente + deságio == valorBruto` em termos da
+    moeda de pagamento; `valorBruto` em si não é convertido/persistido (fica só na moeda do
+    título, valor de face contratual).
+  - Cotação é recebida **por parâmetro na API, por recebível** (`RecebivelRequest.cotacaoCambio`)
+    e não cadastrada em tabela de referência como `taxaBase`/`spreadRisco` — decisão deliberada,
+    pois cotação de câmbio muda em tempo real, diferente dos proxies estáveis CDI/SOFR.
+  - Persistência: nova migration (`V202609181006__adicionar_cambio_recebivel.sql`) adiciona
+    `moeda_pagamento` (not null, backfill = `moeda` para linhas existentes) e `cotacao_cambio`
+    (nullable) na tabela `recebivel`, com `CHECK` garantindo consistência (`cotacao_cambio` só
+    não-nulo quando `moeda_pagamento <> moeda`) — defesa em profundidade além da validação no
+    domínio.
+  - Fios propagados em toda a cadeia: `RecebivelRequest`/`RecebivelResponse`,
+    `ComandoPrecificarLote.ComandoRecebivel`, `RecebivelEntity`, `RecebivelLeitura`. Testes novos:
+    `ConversorCambialTest`, validações cruzadas em `RecebivelTest`, cenário cross-currency em
+    `PrecificarLoteServiceTest` e round-trip de persistência em `PersistenciaIntegrationTest`.

@@ -67,9 +67,9 @@ class PrecificarLoteServiceTest {
 
         ComandoPrecificarLote comando = new ComandoPrecificarLote(List.of(
                 new ComandoPrecificarLote.ComandoRecebivel("Cedente A", new BigDecimal("1000.00"),
-                        Moeda.BRL, LocalDate.of(2026, 12, 31), CategoriaRisco.B),
+                        Moeda.BRL, LocalDate.of(2026, 12, 31), CategoriaRisco.B, null, null),
                 new ComandoPrecificarLote.ComandoRecebivel("Cedente B", new BigDecimal("2000.00"),
-                        Moeda.BRL, LocalDate.of(2027, 1, 15), CategoriaRisco.B)
+                        Moeda.BRL, LocalDate.of(2027, 1, 15), CategoriaRisco.B, null, null)
         ));
 
         LoteRecebiveis lote = service.precificar(comando);
@@ -88,9 +88,9 @@ class PrecificarLoteServiceTest {
 
         ComandoPrecificarLote comando = new ComandoPrecificarLote(List.of(
                 new ComandoPrecificarLote.ComandoRecebivel("Cedente A", new BigDecimal("1000.00"),
-                        Moeda.BRL, LocalDate.of(2026, 9, 18), CategoriaRisco.B), // vencimento == dataReferencia
+                        Moeda.BRL, LocalDate.of(2026, 9, 18), CategoriaRisco.B, null, null), // vencimento == dataReferencia
                 new ComandoPrecificarLote.ComandoRecebivel("Cedente B", new BigDecimal("2000.00"),
-                        Moeda.BRL, LocalDate.of(2027, 1, 15), CategoriaRisco.B)
+                        Moeda.BRL, LocalDate.of(2027, 1, 15), CategoriaRisco.B, null, null)
         ));
 
         LoteRecebiveis lote = service.precificar(comando);
@@ -108,12 +108,36 @@ class PrecificarLoteServiceTest {
 
         ComandoPrecificarLote comando = new ComandoPrecificarLote(List.of(
                 new ComandoPrecificarLote.ComandoRecebivel("Cedente A", new BigDecimal("1000.00"),
-                        Moeda.USD, LocalDate.of(2026, 12, 31), CategoriaRisco.B)
+                        Moeda.USD, LocalDate.of(2026, 12, 31), CategoriaRisco.B, null, null)
         ));
 
         LoteRecebiveis lote = service.precificar(comando);
 
         assertThat(lote.getStatus()).isEqualTo(StatusLote.ERRO);
         verify(salvarLotePort).salvar(any());
+    }
+
+    @Test
+    void precificaCrossCurrencyConvertendoValoresParaAMoedaDePagamento() {
+        when(taxaBaseRepository.buscarTaxaVigente(Moeda.BRL)).thenReturn(new BigDecimal("0.05"));
+        when(categoriaRiscoRepository.buscarSpread(CategoriaRisco.B)).thenReturn(new BigDecimal("0.03"));
+        service = new PrecificarLoteService(taxaBaseRepository, categoriaRiscoRepository,
+                salvarLotePort, registrarEventoPort, new BigDecimal("0.02"), RELOGIO_FIXO);
+
+        ComandoPrecificarLote comando = new ComandoPrecificarLote(List.of(
+                new ComandoPrecificarLote.ComandoRecebivel("Cedente A", new BigDecimal("11000.00"),
+                        Moeda.BRL, LocalDate.of(2026, 10, 18), CategoriaRisco.B, Moeda.USD, new BigDecimal("5.00"))
+        ));
+
+        LoteRecebiveis lote = service.precificar(comando);
+
+        // taxaDesconto = 0.10, prazoMeses = 1 -> valorPresente BRL = 11000/1.10 = 10000.00
+        // convertido para USD (cotacao 5.00): 10000/5 = 2000.00; valorBruto convertido = 11000/5 = 2200.00
+        var recebivel = lote.getRecebiveis().get(0);
+        assertThat(recebivel.getStatus()).isEqualTo(StatusRecebivel.PRECIFICADO);
+        assertThat(recebivel.getValorPresente()).isEqualByComparingTo("2000.00");
+        assertThat(recebivel.getValorDesagio()).isEqualByComparingTo("200.00");
+        assertThat(recebivel.getMoedaPagamento()).isEqualTo(Moeda.USD);
+        assertThat(recebivel.getCotacaoCambio()).isEqualByComparingTo("5.00");
     }
 }

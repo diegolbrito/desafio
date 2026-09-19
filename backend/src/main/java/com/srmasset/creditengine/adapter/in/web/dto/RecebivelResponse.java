@@ -23,19 +23,27 @@ public record RecebivelResponse(UUID id, String cedente,
                                  @Schema(type = "string", example = "14200.00") BigDecimal valorPresente,
                                  @Schema(type = "string", example = "800.00") BigDecimal valorDesagio,
                                  @Schema(type = "string", example = "0.146500") BigDecimal taxaDescontoAplicada,
-                                 String motivoRejeicao) {
+                                 String motivoRejeicao,
+                                 @Schema(description = "Moeda em que o recebivel e' efetivamente pago; "
+                                         + "igual a `moeda` quando nao ha conversao cambial.")
+                                 Moeda moedaPagamento,
+                                 @Schema(type = "string", example = "5.20", description = "Cotacao (BRL por 1 "
+                                         + "USD) usada na conversao; null quando moedaPagamento == moeda.")
+                                 BigDecimal cotacaoCambio) {
 
     public static RecebivelResponse from(Recebivel recebivel) {
         return new RecebivelResponse(recebivel.getId(), recebivel.getCedente(), recebivel.getValorBruto(),
                 recebivel.getMoeda(), recebivel.getDataVencimento(), recebivel.getCategoriaRisco(),
                 recebivel.getStatus(), recebivel.getValorPresente(), recebivel.getValorDesagio(),
-                recebivel.getTaxaDescontoAplicada(), recebivel.getMotivoRejeicao());
+                recebivel.getTaxaDescontoAplicada(), recebivel.getMotivoRejeicao(),
+                recebivel.getMoedaPagamento(), recebivel.getCotacaoCambio());
     }
 
     public static RecebivelResponse from(RecebivelLeitura recebivel) {
         return new RecebivelResponse(recebivel.id(), recebivel.cedente(), recebivel.valorBruto(),
                 recebivel.moeda(), recebivel.dataVencimento(), recebivel.categoriaRisco(),
                 recebivel.status(), recebivel.valorPresente(), recebivel.valorDesagio(),
-                recebivel.taxaDescontoAplicada(), recebivel.motivoRejeicao());
+                recebivel.taxaDescontoAplicada(), recebivel.motivoRejeicao(),
+                recebivel.moedaPagamento(), recebivel.cotacaoCambio());
     }
 }

@@ -13,5 +13,5 @@ public record RecebivelLeitura(UUID id, String cedente, BigDecimal valorBruto, M
                                 LocalDate dataVencimento, CategoriaRisco categoriaRisco,
                                 StatusRecebivel status, BigDecimal valorPresente,
                                 BigDecimal valorDesagio, BigDecimal taxaDescontoAplicada,
-                                String motivoRejeicao) {
+                                String motivoRejeicao, Moeda moedaPagamento, BigDecimal cotacaoCambio) {
 }
