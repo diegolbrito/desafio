@@ -50,7 +50,7 @@ class PrecificarLoteServiceTest {
     @BeforeEach
     void setUp() {
         service = new PrecificarLoteService(taxaBaseRepository, categoriaRiscoRepository,
-                salvarLotePort, registrarEventoPort, new BigDecimal("0.005"), RELOGIO_FIXO);
+                salvarLotePort, registrarEventoPort, new BigDecimal("0.005"), new BigDecimal("5.20"), RELOGIO_FIXO);
 
         when(salvarLotePort.salvar(any())).thenAnswer(invocation -> {
             LoteRecebiveis lote = invocation.getArgument(0);
@@ -67,9 +67,9 @@ class PrecificarLoteServiceTest {
 
         ComandoPrecificarLote comando = new ComandoPrecificarLote(List.of(
                 new ComandoPrecificarLote.ComandoRecebivel("Cedente A", new BigDecimal("1000.00"),
-                        Moeda.BRL, LocalDate.of(2026, 12, 31), CategoriaRisco.B, null, null),
+                        Moeda.BRL, LocalDate.of(2026, 12, 31), CategoriaRisco.B, null),
                 new ComandoPrecificarLote.ComandoRecebivel("Cedente B", new BigDecimal("2000.00"),
-                        Moeda.BRL, LocalDate.of(2027, 1, 15), CategoriaRisco.B, null, null)
+                        Moeda.BRL, LocalDate.of(2027, 1, 15), CategoriaRisco.B, null)
         ));
 
         LoteRecebiveis lote = service.precificar(comando);
@@ -88,9 +88,9 @@ class PrecificarLoteServiceTest {
 
         ComandoPrecificarLote comando = new ComandoPrecificarLote(List.of(
                 new ComandoPrecificarLote.ComandoRecebivel("Cedente A", new BigDecimal("1000.00"),
-                        Moeda.BRL, LocalDate.of(2026, 9, 18), CategoriaRisco.B, null, null), // vencimento == dataReferencia
+                        Moeda.BRL, LocalDate.of(2026, 9, 18), CategoriaRisco.B, null), // vencimento == dataReferencia
                 new ComandoPrecificarLote.ComandoRecebivel("Cedente B", new BigDecimal("2000.00"),
-                        Moeda.BRL, LocalDate.of(2027, 1, 15), CategoriaRisco.B, null, null)
+                        Moeda.BRL, LocalDate.of(2027, 1, 15), CategoriaRisco.B, null)
         ));
 
         LoteRecebiveis lote = service.precificar(comando);
@@ -108,7 +108,7 @@ class PrecificarLoteServiceTest {
 
         ComandoPrecificarLote comando = new ComandoPrecificarLote(List.of(
                 new ComandoPrecificarLote.ComandoRecebivel("Cedente A", new BigDecimal("1000.00"),
-                        Moeda.USD, LocalDate.of(2026, 12, 31), CategoriaRisco.B, null, null)
+                        Moeda.USD, LocalDate.of(2026, 12, 31), CategoriaRisco.B, null)
         ));
 
         LoteRecebiveis lote = service.precificar(comando);
@@ -122,11 +122,11 @@ class PrecificarLoteServiceTest {
         when(taxaBaseRepository.buscarTaxaVigente(Moeda.BRL)).thenReturn(new BigDecimal("0.05"));
         when(categoriaRiscoRepository.buscarSpread(CategoriaRisco.B)).thenReturn(new BigDecimal("0.03"));
         service = new PrecificarLoteService(taxaBaseRepository, categoriaRiscoRepository,
-                salvarLotePort, registrarEventoPort, new BigDecimal("0.02"), RELOGIO_FIXO);
+                salvarLotePort, registrarEventoPort, new BigDecimal("0.02"), new BigDecimal("5.00"), RELOGIO_FIXO);
 
         ComandoPrecificarLote comando = new ComandoPrecificarLote(List.of(
                 new ComandoPrecificarLote.ComandoRecebivel("Cedente A", new BigDecimal("11000.00"),
-                        Moeda.BRL, LocalDate.of(2026, 10, 18), CategoriaRisco.B, Moeda.USD, new BigDecimal("5.00"))
+                        Moeda.BRL, LocalDate.of(2026, 10, 18), CategoriaRisco.B, Moeda.USD)
         ));
 
         LoteRecebiveis lote = service.precificar(comando);

@@ -24,6 +24,11 @@ credit-engine:
   # spread de risco na formula de desagio (ver SPEC.md, "Premissas adotadas" item 4).
   # Parametro estavel, por isso vive na aplicacao e nao em tabela de referencia no banco.
   custo-operacional: ${CUSTO_OPERACIONAL:0.000}
+  # Cotacao de cambio (quantidade de BRL por 1 USD) usada para converter o resultado do
+  # desagio quando moedaPagamento difere da moeda do titulo (cross-currency - ver SPEC.md,
+  # "Premissas adotadas" item 3). Mesmo padrao de custo-operacional: parametro de aplicacao,
+  # nao recebido via API, pois nao e' cadastro por recebivel, e' taxa vigente do sistema.
+  cotacao-cambio: ${COTACAO_CAMBIO:5.20}
   cors:
     # Origens do frontend autorizadas a chamar a API (politica de navegador,
     # nao autenticacao). Lista separada por virgula.

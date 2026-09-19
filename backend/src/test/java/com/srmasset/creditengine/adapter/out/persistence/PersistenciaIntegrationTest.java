@@ -97,9 +97,9 @@ class PersistenciaIntegrationTest {
     @Test
     void salvaRecebivelCrossCurrencyComMoedaPagamentoECotacao() {
         Recebivel recebivel = Recebivel.criar("Cedente Teste", new BigDecimal("1000.00"), Moeda.BRL,
-                LocalDate.now().plusDays(30), CategoriaRisco.B, Moeda.USD, new BigDecimal("5.20"));
+                LocalDate.now().plusDays(30), CategoriaRisco.B, Moeda.USD);
         recebivel.aplicarPrecificacao(new ResultadoDesagio(
-                new BigDecimal("182.69"), new BigDecimal("9.62"), new BigDecimal("0.105000")));
+                new BigDecimal("182.69"), new BigDecimal("9.62"), new BigDecimal("0.105000")), new BigDecimal("5.20"));
         LoteRecebiveis lote = LoteRecebiveis.criar(LocalDate.now(), List.of(recebivel));
         lote.marcarPrecificado();
 
@@ -132,11 +132,11 @@ class PersistenciaIntegrationTest {
     void precificaLoteCompletoUsandoAdaptersReais() {
         PrecificarLoteService service = new PrecificarLoteService(
                 taxaBaseAdapter, categoriaRiscoAdapter, loteAdapter, eventoAdapter,
-                new BigDecimal("0.005"), Clock.systemUTC());
+                new BigDecimal("0.005"), new BigDecimal("5.20"), Clock.systemUTC());
 
         ComandoPrecificarLote comando = new ComandoPrecificarLote(List.of(
                 new ComandoPrecificarLote.ComandoRecebivel("Cedente Integracao", new BigDecimal("5000.00"),
-                        Moeda.BRL, LocalDate.now().plusDays(60), CategoriaRisco.C, null, null)
+                        Moeda.BRL, LocalDate.now().plusDays(60), CategoriaRisco.C, null)
         ));
 
         LoteRecebiveis lote = service.precificar(comando);

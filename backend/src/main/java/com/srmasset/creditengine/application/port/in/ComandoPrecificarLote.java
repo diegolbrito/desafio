@@ -16,6 +16,6 @@ public record ComandoPrecificarLote(List<ComandoRecebivel> recebiveis) {
 
     public record ComandoRecebivel(String cedente, BigDecimal valorBruto, Moeda moeda,
                                     LocalDate dataVencimento, CategoriaRisco categoriaRisco,
-                                    Moeda moedaPagamento, BigDecimal cotacaoCambio) {
+                                    Moeda moedaPagamento) {
     }
 }

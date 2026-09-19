@@ -39,6 +39,7 @@ public class PrecificarLoteService implements PrecificarLoteUseCase {
     private final SalvarLoteRecebiveisPort salvarLotePort;
     private final RegistrarEventoTransacaoPort registrarEventoPort;
     private final BigDecimal custoOperacionalPadrao;
+    private final BigDecimal cotacaoCambioPadrao;
     private final Clock clock;
 
     public PrecificarLoteService(TaxaBaseRepositoryPort taxaBaseRepository,
@@ -46,12 +47,14 @@ public class PrecificarLoteService implements PrecificarLoteUseCase {
                                   SalvarLoteRecebiveisPort salvarLotePort,
                                   RegistrarEventoTransacaoPort registrarEventoPort,
                                   BigDecimal custoOperacionalPadrao,
+                                  BigDecimal cotacaoCambioPadrao,
                                   Clock clock) {
         this.taxaBaseRepository = taxaBaseRepository;
         this.categoriaRiscoRepository = categoriaRiscoRepository;
         this.salvarLotePort = salvarLotePort;
         this.registrarEventoPort = registrarEventoPort;
         this.custoOperacionalPadrao = custoOperacionalPadrao;
+        this.cotacaoCambioPadrao = cotacaoCambioPadrao;
         this.clock = clock;
     }
 
@@ -61,7 +64,7 @@ public class PrecificarLoteService implements PrecificarLoteUseCase {
 
         List<Recebivel> recebiveis = comando.recebiveis().stream()
                 .map(r -> Recebivel.criar(r.cedente(), r.valorBruto(), r.moeda(), r.dataVencimento(), r.categoriaRisco(),
-                        r.moedaPagamento(), r.cotacaoCambio()))
+                        r.moedaPagamento()))
                 .toList();
 
         LoteRecebiveis lote = LoteRecebiveis.criar(dataReferencia, recebiveis);
@@ -90,9 +93,10 @@ public class PrecificarLoteService implements PrecificarLoteUseCase {
             ResultadoDesagio resultado = calculadora.calcular(
                     recebivel.getValorBruto(), prazoMeses,
                     taxaBase, spreadRisco, custoOperacionalPadrao);
+            boolean crossCurrency = recebivel.getMoedaPagamento() != recebivel.getMoeda();
             resultado = conversorCambial.converter(resultado, recebivel.getValorBruto(),
-                    recebivel.getMoeda(), recebivel.getMoedaPagamento(), recebivel.getCotacaoCambio());
-            recebivel.aplicarPrecificacao(resultado);
+                    recebivel.getMoeda(), recebivel.getMoedaPagamento(), cotacaoCambioPadrao);
+            recebivel.aplicarPrecificacao(resultado, crossCurrency ? cotacaoCambioPadrao : null);
         } catch (PrazoInvalidoException e) {
             recebivel.rejeitar(e.getMessage());
         }

@@ -34,33 +34,13 @@ class RecebivelTest {
     }
 
     @Test
-    void aceitaCrossCurrencyComCotacaoPositiva() {
+    void aceitaMoedaPagamentoDiferenteDaMoedaDoTitulo() {
         Recebivel recebivel = Recebivel.criar("Cedente", new BigDecimal("1000.00"), Moeda.BRL,
-                LocalDate.of(2026, 12, 31), CategoriaRisco.B, Moeda.USD, new BigDecimal("5.20"));
+                LocalDate.of(2026, 12, 31), CategoriaRisco.B, Moeda.USD);
 
         assertThat(recebivel.getMoedaPagamento()).isEqualTo(Moeda.USD);
-        assertThat(recebivel.getCotacaoCambio()).isEqualByComparingTo("5.20");
-    }
-
-    @Test
-    void rejeitaCrossCurrencySemCotacao() {
-        assertThatThrownBy(() -> Recebivel.criar("Cedente", new BigDecimal("1000.00"), Moeda.BRL,
-                LocalDate.of(2026, 12, 31), CategoriaRisco.B, Moeda.USD, null))
-                .isInstanceOf(RecebivelInvalidoException.class);
-    }
-
-    @Test
-    void rejeitaCrossCurrencyComCotacaoNaoPositiva() {
-        assertThatThrownBy(() -> Recebivel.criar("Cedente", new BigDecimal("1000.00"), Moeda.BRL,
-                LocalDate.of(2026, 12, 31), CategoriaRisco.B, Moeda.USD, BigDecimal.ZERO))
-                .isInstanceOf(RecebivelInvalidoException.class);
-    }
-
-    @Test
-    void rejeitaCotacaoInformadaQuandoMoedaPagamentoEIgualAMoeda() {
-        assertThatThrownBy(() -> Recebivel.criar("Cedente", new BigDecimal("1000.00"), Moeda.BRL,
-                LocalDate.of(2026, 12, 31), CategoriaRisco.B, Moeda.BRL, new BigDecimal("5.20")))
-                .isInstanceOf(RecebivelInvalidoException.class);
+        // cotacaoCambio so e' preenchida na precificacao (vem de configuracao, nao da criacao)
+        assertThat(recebivel.getCotacaoCambio()).isNull();
     }
 
     @Test
@@ -121,6 +101,19 @@ class RecebivelTest {
         assertThat(recebivel.getValorPresente()).isEqualByComparingTo("950.00");
         assertThat(recebivel.getValorDesagio()).isEqualByComparingTo("50.00");
         assertThat(recebivel.getTaxaDescontoAplicada()).isEqualByComparingTo("0.105000");
+        assertThat(recebivel.getCotacaoCambio()).isNull();
+    }
+
+    @Test
+    void aplicarPrecificacaoComCotacaoSnapshotaACotacaoAplicada() {
+        Recebivel recebivel = Recebivel.criar("Cedente", new BigDecimal("1000.00"), Moeda.BRL,
+                LocalDate.of(2026, 12, 31), CategoriaRisco.B, Moeda.USD);
+        ResultadoDesagio resultado = new ResultadoDesagio(
+                new BigDecimal("190.00"), new BigDecimal("10.00"), new BigDecimal("0.105000"));
+
+        recebivel.aplicarPrecificacao(resultado, new BigDecimal("5.20"));
+
+        assertThat(recebivel.getCotacaoCambio()).isEqualByComparingTo("5.20");
     }
 
     @Test

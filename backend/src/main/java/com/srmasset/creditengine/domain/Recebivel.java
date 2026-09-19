@@ -21,41 +21,41 @@ public class Recebivel {
     private final LocalDate dataVencimento;
     private final CategoriaRisco categoriaRisco;
     private final Moeda moedaPagamento;
-    private final BigDecimal cotacaoCambio;
 
     private StatusRecebivel status;
     private BigDecimal valorPresente;
     private BigDecimal valorDesagio;
     private BigDecimal taxaDescontoAplicada;
+    private BigDecimal cotacaoCambio;
     private String motivoRejeicao;
 
     private Recebivel(String cedente, BigDecimal valorBruto, Moeda moeda, LocalDate dataVencimento,
-                       CategoriaRisco categoriaRisco, Moeda moedaPagamento, BigDecimal cotacaoCambio) {
+                       CategoriaRisco categoriaRisco, Moeda moedaPagamento) {
         this.cedente = cedente;
         this.valorBruto = valorBruto;
         this.moeda = moeda;
         this.dataVencimento = dataVencimento;
         this.categoriaRisco = categoriaRisco;
         this.moedaPagamento = moedaPagamento;
-        this.cotacaoCambio = cotacaoCambio;
         this.status = StatusRecebivel.PENDENTE;
     }
 
     public static Recebivel criar(String cedente, BigDecimal valorBruto, Moeda moeda,
                                    LocalDate dataVencimento, CategoriaRisco categoriaRisco) {
-        return criar(cedente, valorBruto, moeda, dataVencimento, categoriaRisco, moeda, null);
+        return criar(cedente, valorBruto, moeda, dataVencimento, categoriaRisco, moeda);
     }
 
     /**
      * @param moedaPagamento moeda em que o recebivel e' efetivamente pago; se {@code null},
-     *                       assume a propria {@code moeda} do titulo (sem cross-currency).
-     * @param cotacaoCambio  cotacao "quantidade de BRL por 1 USD" (ver SPEC.md, "Premissas
-     *                       adotadas" item 3); obrigatoria e positiva quando moedaPagamento
-     *                       difere de moeda, e nao deve ser informada quando sao iguais.
+     *                       assume a propria {@code moeda} do titulo (sem cross-currency). A
+     *                       cotacao de cambio usada na conversao (quando as moedas diferem) nao
+     *                       e' informada aqui - vem de configuracao da aplicacao (mesmo padrao
+     *                       de custoOperacional, ver SPEC.md "Premissas adotadas" item 3) e e'
+     *                       aplicada/snapshotada em {@link #aplicarPrecificacao}.
      */
     public static Recebivel criar(String cedente, BigDecimal valorBruto, Moeda moeda,
                                    LocalDate dataVencimento, CategoriaRisco categoriaRisco,
-                                   Moeda moedaPagamento, BigDecimal cotacaoCambio) {
+                                   Moeda moedaPagamento) {
         if (cedente == null || cedente.isBlank()) {
             throw new RecebivelInvalidoException("Cedente e obrigatorio");
         }
@@ -72,18 +72,7 @@ public class Recebivel {
             throw new RecebivelInvalidoException("Categoria de risco e obrigatoria");
         }
         Moeda moedaPagamentoResolvida = moedaPagamento == null ? moeda : moedaPagamento;
-        if (moedaPagamentoResolvida != moeda) {
-            if (cotacaoCambio == null || cotacaoCambio.compareTo(BigDecimal.ZERO) <= 0) {
-                throw new RecebivelInvalidoException(
-                        "Cotacao de cambio e obrigatoria e deve ser positiva quando a moeda de pagamento (%s) difere da moeda do titulo (%s)"
-                                .formatted(moedaPagamentoResolvida, moeda));
-            }
-        } else if (cotacaoCambio != null) {
-            throw new RecebivelInvalidoException(
-                    "Cotacao de cambio nao deve ser informada quando a moeda de pagamento e igual a moeda do titulo");
-        }
-        return new Recebivel(cedente, valorBruto, moeda, dataVencimento, categoriaRisco,
-                moedaPagamentoResolvida, cotacaoCambio);
+        return new Recebivel(cedente, valorBruto, moeda, dataVencimento, categoriaRisco, moedaPagamentoResolvida);
     }
 
     /**
@@ -107,10 +96,21 @@ public class Recebivel {
     }
 
     public void aplicarPrecificacao(ResultadoDesagio resultado) {
+        aplicarPrecificacao(resultado, null);
+    }
+
+    /**
+     * @param cotacaoCambioAplicada cotacao de cambio efetivamente usada para converter o
+     *                              resultado para moedaPagamento (snapshot de auditoria - ver
+     *                              SPEC.md "Premissas adotadas" item 3); {@code null} quando
+     *                              moedaPagamento == moeda (sem conversao).
+     */
+    public void aplicarPrecificacao(ResultadoDesagio resultado, BigDecimal cotacaoCambioAplicada) {
         exigirStatus(StatusRecebivel.PENDENTE);
         this.valorPresente = resultado.valorPresente();
         this.valorDesagio = resultado.valorDesagio();
         this.taxaDescontoAplicada = resultado.taxaDescontoAplicada();
+        this.cotacaoCambio = cotacaoCambioAplicada;
         this.status = StatusRecebivel.PRECIFICADO;
     }
 
