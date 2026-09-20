@@ -1,5 +1,7 @@
 # SRM Credit Engine
 
+[![CI](https://github.com/diegolbrito/desafio/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/diegolbrito/desafio/actions/workflows/ci.yml)
+
 Motor de precificação e registro auditável de lotes de recebíveis (duplicatas, contratos)
 adquiridos por um FIDC. Recebe um lote de recebíveis, calcula o deságio de cada item com base no
 risco do ativo e na moeda, e registra o resultado de forma auditável.
