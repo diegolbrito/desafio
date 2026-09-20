@@ -68,9 +68,10 @@ risco do ativo e na moeda de pagamento, e registrar a transação de forma audit
 - Status do lote: `RECEBIDO` → `PRECIFICADO` (ou `ERRO` em falha de validação/cálculo).
 - Validação estrutural do payload (Bean Validation) é all-or-nothing (400 se inválido). Erros de regra de negócio por recebível (ex.: data de vencimento no passado) rejeitam apenas aquele item — não abortam o lote inteiro; cada recebível carrega seu próprio status (`PRECIFICADO` / `REJEITADO`) e motivo.
 
-### 6. Escopo: liquidação fora do MVP
-- Fluxo implementado: **cadastrar lote → precificar (calcular deságio) → registrar transação de forma auditável**.
-- Aprovação, liquidação/pagamento ao cedente, liquidação parcial, cancelamento e recompra ficam **fora do escopo** deste desafio.
+### 6. Escopo: liquidação
+- Fluxo implementado: **cadastrar lote → precificar (calcular deságio) → liquidar (pagar) recebível a recebível → registrar transação de forma auditável**.
+- A liquidação foi adicionada ao MVP (ver item 9) com o seguinte recorte: **um recebível é liquidado de uma vez só, pelo valor presente integral** (`valorPresente`, já na moeda de pagamento) — não há liquidação parcial (pagar uma fração do valor devido de um recebível).
+- Aprovação (do lote ou da liquidação), cancelamento e recompra continuam **fora do escopo** deste desafio.
 
 ### 7. Cadastro do ativo
 - O campo foi renomeado de `cedente` para `ativo` (mais fiel ao que de fato é preenchido nos exemplos — o tipo/instrumento do recebível, ex.: "Duplicata Mercantil", "Cheque Pré-datado", não o nome da empresa cedente). Continua um campo de referência (texto livre), **sem entidade/cadastro próprio** no MVP.
@@ -78,6 +79,14 @@ risco do ativo e na moeda de pagamento, e registrar a transação de forma audit
 ### 8. Escala decimal de valores monetários
 - A seção "Decisões de precisão numérica" (2 casas decimais) e a tabela "Tipos de dados canônicos" (`numeric(19,2)`) estavam em contradição. Decisão: prevalece **2 casas decimais** (`numeric(19,2)`) para todo valor monetário, em todas as camadas — inclusive `valorPresente` e `deságio` calculados. A tabela de tipos canônicos e o exemplo de campo foram corrigidos para `numeric(19,2)` / `"15000.00"`.
 - Cálculos intermediários usam `BigDecimal` com `MathContext` de alta precisão (sem arredondar); o arredondamento HALF_EVEN para 2 casas ocorre apenas ao fixar o resultado final (`valorPresente`, `deságio`) antes de persistir/retornar.
+
+### 9. Liquidação de recebível — modelo e idempotência
+- **Modelo**: novo status `LIQUIDADO` em `StatusRecebivel`, transição só permitida a partir de `PRECIFICADO` (quem nunca foi precificado ou foi `REJEITADO` não tem `valorPresente` — não há o que pagar). Novo campo `liquidadoEm` (timestamp) fica em `recebivel`, junto com o restante do estado do item — não há tabela/agregado `liquidacao` separado, porque não existe liquidação parcial (item 6): a informação cabe inteira em "este recebível está liquidado, desde quando".
+- **Endpoint**: `PUT /api/v1/lotes-recebiveis/{loteId}/recebiveis/{recebivelId}/liquidacao` (não `POST`). Escolha deliberada: PUT é idempotente por definição HTTP ("colocar o sub-recurso liquidação neste estado"), o que já comunica a intenção da API antes mesmo de olhar o corpo da resposta. Não há corpo de requisição (liquidação é sempre integral, na data corrente do servidor).
+- **Por que idempotência baseada em estado, e não `Idempotency-Key`**: um cabeçalho de chave de idempotência (padrão Stripe) resolve o caso geral de "requisições com corpo variável que não podem repetir efeito". Aqui não há corpo nem variação possível — a ação é inteiramente descrita pela identidade do recebível ("liquidar este") e o próprio estado do recurso já é a fronteira natural de idempotência: chamar de novo um recebível já `LIQUIDADO` é, por definição, a mesma operação. Adicionar uma chave de idempotência seria complexidade sem ganho aqui.
+- **Comportamento na repetição**: uma segunda chamada (retry de rede, duplo clique) para um recebível já `LIQUIDADO` retorna `200 OK` com o mesmo resultado (mesmo `liquidadoEm` da primeira vez), sem lançar exceção, sem alterar o estado e **sem gerar um novo evento de auditoria** — `Recebivel.liquidar()` detecta o estado já-liquidado e retorna sem efeito colateral (ver javadoc do método).
+- **Corrida concorrente**: duas requisições verdadeiramente simultâneas para o mesmo recebível poderiam, em tese, ambas ler `status=PRECIFICADO` antes de qualquer uma comitar. Em vez de usar o `@Version` (lock otimista) já padrão nas demais escritas — que resolveria a corrida devolvendo `409 Conflict` para o perdedor, obrigando o cliente a tratar esse caso à parte —, optamos por **lock pessimista** (`SELECT ... FOR UPDATE`, via `@Lock(PESSIMISTIC_WRITE)` no repositório) só na busca que antecede a liquidação: a segunda requisição fica bloqueada até a primeira commitar, e então enxerga o recebível já `LIQUIDADO` e retorna o mesmo `200` idempotente — nenhuma das duas chamadas vê um erro. **Ressalva honesta**: não há teste automatizado de concorrência real (duas threads/conexões simultâneas) provando esse comportamento sob corrida — a garantia foi validada via teste de repetição sequencial (chamar duas vezes seguidas) e via leitura do mecanismo de lock, mas não via um teste de race condition disparado de fato.
+- **Resposta HTTP**: `200` (sucesso ou repetição idempotente), `404` (lote ou recebível inexistente, ou recebível não pertence ao lote informado), `422` (recebível não está `PRECIFICADO` nem `LIQUIDADO` — nunca foi precificado ou foi rejeitado).
 
 ## Decisões de precisão numérica
 

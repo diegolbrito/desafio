@@ -1,9 +1,11 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Button } from '@/components/ui/button'
 import { Alert } from '../../../shared/ui/Alert'
 import { TEXTOS } from '../constants/textos'
+import { useLiquidarRecebivel } from '../hooks/useLiquidarRecebivel'
 import { useLoteRecebiveis } from '../hooks/useLoteRecebiveis'
 import { extrairMensagemErro } from '../utils/extrairMensagemErro'
-import { formatarData, formatarMoeda, formatarPercentual } from '../utils/formatters'
+import { formatarData, formatarDataHora, formatarMoeda, formatarPercentual } from '../utils/formatters'
 import { StatusBadge } from './StatusBadge'
 
 interface LoteRecebiveisDetalheProps {
@@ -12,6 +14,8 @@ interface LoteRecebiveisDetalheProps {
 
 export function LoteRecebiveisDetalhe({ id }: LoteRecebiveisDetalheProps) {
   const { data: lote, isLoading, isError, error } = useLoteRecebiveis(id)
+  const { mutate: liquidar, isPending: liquidando, isError: erroAoLiquidar, variables: recebivelEmLiquidacao } =
+    useLiquidarRecebivel(id)
 
   if (isLoading) {
     return <p className="text-sm text-muted-foreground">{TEXTOS.detalhe.carregando}</p>
@@ -48,6 +52,8 @@ export function LoteRecebiveisDetalhe({ id }: LoteRecebiveisDetalheProps) {
               <TableHead>{TEXTOS.detalhe.colunaTaxa}</TableHead>
               <TableHead>{TEXTOS.detalhe.colunaStatus}</TableHead>
               <TableHead>{TEXTOS.detalhe.colunaMotivo}</TableHead>
+              <TableHead>{TEXTOS.detalhe.colunaLiquidadoEm}</TableHead>
+              <TableHead>{TEXTOS.detalhe.colunaAcoes}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -65,11 +71,29 @@ export function LoteRecebiveisDetalhe({ id }: LoteRecebiveisDetalheProps) {
                   <StatusBadge status={recebivel.status} />
                 </TableCell>
                 <TableCell>{recebivel.motivoRejeicao ?? '—'}</TableCell>
+                <TableCell>{formatarDataHora(recebivel.liquidadoEm)}</TableCell>
+                <TableCell>
+                  {recebivel.status === 'PRECIFICADO' && recebivel.id && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={liquidando}
+                      onClick={() => liquidar(recebivel.id!)}
+                    >
+                      {liquidando && recebivelEmLiquidacao === recebivel.id
+                        ? TEXTOS.detalhe.liquidando
+                        : TEXTOS.detalhe.acaoLiquidar}
+                    </Button>
+                  )}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </div>
+
+      {erroAoLiquidar && <Alert variant="error">{TEXTOS.detalhe.liquidacaoErro}</Alert>}
     </section>
   )
 }

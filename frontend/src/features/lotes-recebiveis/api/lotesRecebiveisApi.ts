@@ -28,3 +28,14 @@ export function listarLotesRecebiveis(page: number, size: number): Promise<Pagin
 export function buscarLoteRecebiveis(id: string): Promise<LoteRecebiveisResponse> {
   return httpClient<LoteRecebiveisResponse>(`/api/v1/lotes-recebiveis/${id}`)
 }
+
+/**
+ * PUT (nao POST) deliberadamente: operacao idempotente (ver SPEC.md - liquidacao).
+ * Chamar de novo para o mesmo recebivel (retry de rede, duplo clique) retorna o
+ * mesmo resultado, sem gerar uma nova liquidacao.
+ */
+export function liquidarRecebivel(loteId: string, recebivelId: string): Promise<RecebivelResponse> {
+  return httpClient<RecebivelResponse>(`/api/v1/lotes-recebiveis/${loteId}/recebiveis/${recebivelId}/liquidacao`, {
+    method: 'PUT',
+  })
+}

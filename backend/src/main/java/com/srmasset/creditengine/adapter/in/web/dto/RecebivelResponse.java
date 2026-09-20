@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 /**
@@ -29,14 +30,17 @@ public record RecebivelResponse(UUID id, String ativo,
                                  Moeda moedaPagamento,
                                  @Schema(type = "string", example = "5.20", description = "Cotacao (BRL por 1 "
                                          + "USD) usada na conversao; null quando moedaPagamento == moeda.")
-                                 BigDecimal cotacaoCambio) {
+                                 BigDecimal cotacaoCambio,
+                                 @Schema(description = "Data/hora em que o recebivel foi liquidado (pago ao "
+                                         + "cedente); null enquanto nao liquidado.")
+                                 OffsetDateTime liquidadoEm) {
 
     public static RecebivelResponse from(Recebivel recebivel) {
         return new RecebivelResponse(recebivel.getId(), recebivel.getAtivo(), recebivel.getValorBruto(),
                 recebivel.getMoeda(), recebivel.getDataVencimento(), recebivel.getCategoriaRisco(),
                 recebivel.getStatus(), recebivel.getValorPresente(), recebivel.getValorDesagio(),
                 recebivel.getTaxaDescontoAplicada(), recebivel.getMotivoRejeicao(),
-                recebivel.getMoedaPagamento(), recebivel.getCotacaoCambio());
+                recebivel.getMoedaPagamento(), recebivel.getCotacaoCambio(), recebivel.getLiquidadoEm());
     }
 
     public static RecebivelResponse from(RecebivelLeitura recebivel) {
@@ -44,6 +48,6 @@ public record RecebivelResponse(UUID id, String ativo,
                 recebivel.moeda(), recebivel.dataVencimento(), recebivel.categoriaRisco(),
                 recebivel.status(), recebivel.valorPresente(), recebivel.valorDesagio(),
                 recebivel.taxaDescontoAplicada(), recebivel.motivoRejeicao(),
-                recebivel.moedaPagamento(), recebivel.cotacaoCambio());
+                recebivel.moedaPagamento(), recebivel.cotacaoCambio(), recebivel.liquidadoEm());
     }
 }

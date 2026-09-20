@@ -1,10 +1,12 @@
 package com.srmasset.creditengine.domain;
 
+import com.srmasset.creditengine.domain.exception.LiquidacaoInvalidaException;
 import com.srmasset.creditengine.domain.exception.PrazoInvalidoException;
 import com.srmasset.creditengine.domain.exception.RecebivelInvalidoException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
@@ -31,6 +33,7 @@ public class Recebivel {
     private BigDecimal taxaDescontoAplicada;
     private BigDecimal cotacaoCambio;
     private String motivoRejeicao;
+    private OffsetDateTime liquidadoEm;
 
     private Recebivel(String ativo, BigDecimal valorBruto, LocalDate dataVencimento,
                        CategoriaRisco categoriaRisco, Moeda moedaPagamento) {
@@ -122,8 +125,63 @@ public class Recebivel {
         this.status = StatusRecebivel.REJEITADO;
     }
 
+    /**
+     * Liquida o recebivel (paga o valorPresente ao cedente, na moedaPagamento),
+     * transicionando PRECIFICADO -> LIQUIDADO. So' pode ser liquidado quem foi
+     * precificado com sucesso (PENDENTE/REJEITADO nunca tiveram valorPresente
+     * calculado, nao ha o que pagar).
+     *
+     * <p>Idempotente por desenho (ver SPEC.md "Premissas adotadas" - liquidacao):
+     * chamar novamente um recebivel ja LIQUIDADO nao lanca excecao nem altera
+     * {@code liquidadoEm} - apenas retorna {@code false}, sinalizando ao chamador
+     * que nao ha novo efeito colateral a registrar (ex.: nao emitir novo evento de
+     * auditoria). Isso e' o que garante que uma requisicao HTTP repetida (retry de
+     * rede, duplo clique) nunca gera duas liquidacoes.
+     *
+     * @return {@code true} se a liquidacao foi efetivamente realizada agora;
+     *         {@code false} se o recebivel ja estava LIQUIDADO (chamada idempotente).
+     */
+    public boolean liquidar(OffsetDateTime agora) {
+        if (this.status == StatusRecebivel.LIQUIDADO) {
+            return false;
+        }
+        if (this.status != StatusRecebivel.PRECIFICADO) {
+            throw new LiquidacaoInvalidaException(
+                    "Recebivel nao pode ser liquidado: status atual e %s, esperado PRECIFICADO"
+                            .formatted(this.status));
+        }
+        this.status = StatusRecebivel.LIQUIDADO;
+        this.liquidadoEm = agora;
+        return true;
+    }
+
     public void atribuirId(UUID id) {
         this.id = id;
+    }
+
+    /**
+     * Reconstitui um recebivel ja existente a partir do estado persistido (nao
+     * repete a validacao estrutural de {@link #criar} - esses dados ja a
+     * passaram na criacao original). Uso restrito a adapters de persistencia,
+     * para reidratar o agregado antes de aplicar uma transicao de estado (ex.:
+     * {@link #liquidar}).
+     */
+    public static Recebivel reconstituir(UUID id, String ativo, BigDecimal valorBruto,
+                                          LocalDate dataVencimento, CategoriaRisco categoriaRisco,
+                                          Moeda moedaPagamento, StatusRecebivel status,
+                                          BigDecimal valorPresente, BigDecimal valorDesagio,
+                                          BigDecimal taxaDescontoAplicada, BigDecimal cotacaoCambio,
+                                          String motivoRejeicao, OffsetDateTime liquidadoEm) {
+        Recebivel recebivel = new Recebivel(ativo, valorBruto, dataVencimento, categoriaRisco, moedaPagamento);
+        recebivel.id = id;
+        recebivel.status = status;
+        recebivel.valorPresente = valorPresente;
+        recebivel.valorDesagio = valorDesagio;
+        recebivel.taxaDescontoAplicada = taxaDescontoAplicada;
+        recebivel.cotacaoCambio = cotacaoCambio;
+        recebivel.motivoRejeicao = motivoRejeicao;
+        recebivel.liquidadoEm = liquidadoEm;
+        return recebivel;
     }
 
     private void exigirStatus(StatusRecebivel esperado) {
@@ -183,5 +241,9 @@ public class Recebivel {
 
     public String getMotivoRejeicao() {
         return motivoRejeicao;
+    }
+
+    public OffsetDateTime getLiquidadoEm() {
+        return liquidadoEm;
     }
 }

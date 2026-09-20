@@ -1,15 +1,18 @@
 package com.srmasset.creditengine.config;
 
 import com.srmasset.creditengine.application.port.in.BuscarLoteRecebiveisUseCase;
+import com.srmasset.creditengine.application.port.in.LiquidarRecebivelUseCase;
 import com.srmasset.creditengine.application.port.in.ListarLotesRecebiveisUseCase;
 import com.srmasset.creditengine.application.port.in.PrecificarLoteUseCase;
 import com.srmasset.creditengine.application.port.out.BuscarLoteRecebiveisPort;
 import com.srmasset.creditengine.application.port.out.CategoriaRiscoRepositoryPort;
+import com.srmasset.creditengine.application.port.out.LiquidarRecebivelPort;
 import com.srmasset.creditengine.application.port.out.ListarLotesRecebiveisPort;
 import com.srmasset.creditengine.application.port.out.RegistrarEventoTransacaoPort;
 import com.srmasset.creditengine.application.port.out.SalvarLoteRecebiveisPort;
 import com.srmasset.creditengine.application.port.out.TaxaBaseRepositoryPort;
 import com.srmasset.creditengine.application.service.BuscarLoteRecebiveisService;
+import com.srmasset.creditengine.application.service.LiquidarRecebivelService;
 import com.srmasset.creditengine.application.service.ListarLotesRecebiveisService;
 import com.srmasset.creditengine.application.service.PrecificarLoteService;
 import org.springframework.beans.factory.annotation.Value;
@@ -54,5 +57,12 @@ public class UseCaseConfig {
     @Bean
     public BuscarLoteRecebiveisUseCase buscarLoteRecebiveisUseCase(BuscarLoteRecebiveisPort buscarLotePort) {
         return new BuscarLoteRecebiveisService(buscarLotePort);
+    }
+
+    @Bean
+    public LiquidarRecebivelUseCase liquidarRecebivelUseCase(LiquidarRecebivelPort liquidarRecebivelPort,
+                                                               RegistrarEventoTransacaoPort registrarEventoPort,
+                                                               Clock clock) {
+        return new LiquidarRecebivelService(liquidarRecebivelPort, registrarEventoPort, clock);
     }
 }
