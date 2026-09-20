@@ -1,0 +1,47 @@
+meta {
+  name: Criar lote (cross-currency)
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/lotes-recebiveis
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "recebiveis": [
+      {
+        "ativo": "Empresa Gama (ativo BRL, paga em USD)",
+        "valorBruto": "10000.00",
+        "dataVencimento": "2027-01-01",
+        "categoriaRisco": "B",
+        "moedaPagamento": "USD"
+      }
+    ]
+  }
+}
+
+docs {
+  Demonstra cross-currency (ativo sempre em BRL, pagamento em outra moeda -
+  ver SPEC.md, "Premissas adotadas" item 3): o desagio e' calculado
+  inteiramente em BRL (taxaBase/spread), usando a cotacao configurada no
+  backend (`credit-engine.cotacao-cambio` / env `COTACAO_CAMBIO` - NAO e'
+  passada por aqui, e' parametro de configuracao da aplicacao, igual
+  `custoOperacional`). Como o ativo e' sempre BRL, a unica direcao de
+  conversao possivel e' BRL -> moedaPagamento.
+
+  Na resposta, so' o `valorPresente` vem convertido para `moedaPagamento` (e'
+  o valor que de fato sera pago); `valorDesagio` continua sempre em BRL,
+  nunca e' convertido (representa o custo do desconto no referencial do
+  proprio ativo, nao um valor a pagar). `cotacaoCambio` vem preenchida com
+  o valor usado (snapshot de auditoria). Por isso, com cross-currency,
+  `valorPresente + valorDesagio != valorBruto` (estao em moedas diferentes) -
+  o invariante so' vale quando nao ha conversao.
+}

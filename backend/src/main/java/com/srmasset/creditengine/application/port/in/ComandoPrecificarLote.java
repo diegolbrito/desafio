@@ -14,7 +14,7 @@ import java.util.List;
  */
 public record ComandoPrecificarLote(List<ComandoRecebivel> recebiveis) {
 
-    public record ComandoRecebivel(String cedente, BigDecimal valorBruto, Moeda moeda,
+    public record ComandoRecebivel(String ativo, BigDecimal valorBruto,
                                     LocalDate dataVencimento, CategoriaRisco categoriaRisco,
                                     Moeda moedaPagamento) {
     }

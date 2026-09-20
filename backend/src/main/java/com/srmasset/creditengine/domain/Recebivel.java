@@ -11,11 +11,14 @@ import java.util.UUID;
 /**
  * Um item do lote de recebiveis. Nasce PENDENTE e transita para PRECIFICADO ou
  * REJEITADO apos o processamento (ver LoteRecebiveis / caso de uso de precificacao).
+ *
+ * <p>O ativo e' sempre denominado em BRL (ver SPEC.md, "Premissas adotadas" item 3) -
+ * {@code moeda} nao e' escolhida por quem cria o recebivel, so' {@code moedaPagamento}.
  */
 public class Recebivel {
 
     private UUID id;
-    private final String cedente;
+    private final String ativo;
     private final BigDecimal valorBruto;
     private final Moeda moeda;
     private final LocalDate dataVencimento;
@@ -29,41 +32,40 @@ public class Recebivel {
     private BigDecimal cotacaoCambio;
     private String motivoRejeicao;
 
-    private Recebivel(String cedente, BigDecimal valorBruto, Moeda moeda, LocalDate dataVencimento,
+    private Recebivel(String ativo, BigDecimal valorBruto, LocalDate dataVencimento,
                        CategoriaRisco categoriaRisco, Moeda moedaPagamento) {
-        this.cedente = cedente;
+        this.ativo = ativo;
         this.valorBruto = valorBruto;
-        this.moeda = moeda;
+        this.moeda = Moeda.BRL;
         this.dataVencimento = dataVencimento;
         this.categoriaRisco = categoriaRisco;
         this.moedaPagamento = moedaPagamento;
         this.status = StatusRecebivel.PENDENTE;
     }
 
-    public static Recebivel criar(String cedente, BigDecimal valorBruto, Moeda moeda,
+    public static Recebivel criar(String ativo, BigDecimal valorBruto,
                                    LocalDate dataVencimento, CategoriaRisco categoriaRisco) {
-        return criar(cedente, valorBruto, moeda, dataVencimento, categoriaRisco, moeda);
+        return criar(ativo, valorBruto, dataVencimento, categoriaRisco, Moeda.BRL);
     }
 
     /**
      * @param moedaPagamento moeda em que o recebivel e' efetivamente pago; se {@code null},
-     *                       assume a propria {@code moeda} do titulo (sem cross-currency). A
-     *                       cotacao de cambio usada na conversao (quando as moedas diferem) nao
-     *                       e' informada aqui - vem de configuracao da aplicacao (mesmo padrao
-     *                       de custoOperacional, ver SPEC.md "Premissas adotadas" item 3) e e'
-     *                       aplicada/snapshotada em {@link #aplicarPrecificacao}.
+     *                       assume BRL (sem cross-currency). O ativo em si e' sempre denominado
+     *                       em BRL - ver SPEC.md "Premissas adotadas" item 3 - por isso quem
+     *                       cria o recebivel so' escolhe a moeda de pagamento, nunca a moeda do
+     *                       ativo. A cotacao de cambio usada na conversao (quando moedaPagamento
+     *                       difere de BRL) nao e' informada aqui - vem de configuracao da
+     *                       aplicacao (mesmo padrao de custoOperacional) e e' aplicada/
+     *                       snapshotada em {@link #aplicarPrecificacao}.
      */
-    public static Recebivel criar(String cedente, BigDecimal valorBruto, Moeda moeda,
+    public static Recebivel criar(String ativo, BigDecimal valorBruto,
                                    LocalDate dataVencimento, CategoriaRisco categoriaRisco,
                                    Moeda moedaPagamento) {
-        if (cedente == null || cedente.isBlank()) {
-            throw new RecebivelInvalidoException("Cedente e obrigatorio");
+        if (ativo == null || ativo.isBlank()) {
+            throw new RecebivelInvalidoException("Ativo e obrigatorio");
         }
         if (valorBruto == null || valorBruto.compareTo(BigDecimal.ZERO) <= 0) {
             throw new RecebivelInvalidoException("Valor bruto deve ser positivo");
-        }
-        if (moeda == null) {
-            throw new RecebivelInvalidoException("Moeda e obrigatoria");
         }
         if (dataVencimento == null) {
             throw new RecebivelInvalidoException("Data de vencimento e obrigatoria");
@@ -71,8 +73,8 @@ public class Recebivel {
         if (categoriaRisco == null) {
             throw new RecebivelInvalidoException("Categoria de risco e obrigatoria");
         }
-        Moeda moedaPagamentoResolvida = moedaPagamento == null ? moeda : moedaPagamento;
-        return new Recebivel(cedente, valorBruto, moeda, dataVencimento, categoriaRisco, moedaPagamentoResolvida);
+        Moeda moedaPagamentoResolvida = moedaPagamento == null ? Moeda.BRL : moedaPagamento;
+        return new Recebivel(ativo, valorBruto, dataVencimento, categoriaRisco, moedaPagamentoResolvida);
     }
 
     /**
@@ -135,8 +137,8 @@ public class Recebivel {
         return id;
     }
 
-    public String getCedente() {
-        return cedente;
+    public String getAtivo() {
+        return ativo;
     }
 
     public BigDecimal getValorBruto() {

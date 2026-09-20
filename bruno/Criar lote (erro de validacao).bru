@@ -1,0 +1,37 @@
+meta {
+  name: Criar lote (erro de validacao)
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/lotes-recebiveis
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "recebiveis": [
+      {
+        "ativo": "",
+        "valorBruto": "-100.00",
+        "dataVencimento": "2027-01-01",
+        "categoriaRisco": "B"
+      }
+    ]
+  }
+}
+
+docs {
+  Demonstra a validacao estrutural do payload (Bean Validation), all-or-nothing
+  (SPEC.md, Premissa 5): ativo em branco e valorBruto negativo retornam 400
+  (Problem Details, RFC 9457) com um item em `errors` por campo invalido, e o
+  lote inteiro e' rejeitado - diferente do 201 com item REJEITADO usado em
+  "Criar lote (item rejeitado)", que e' erro de regra de negocio (por
+  recebivel), nao de formato do payload.
+}

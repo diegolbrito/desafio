@@ -16,7 +16,7 @@ import java.util.UUID;
  * BigDecimal como "number" por padrao, mas a API serializa como string (ver
  * JacksonConfig e SPEC.md, "Tipos de dados canonicos").
  */
-public record RecebivelResponse(UUID id, String cedente,
+public record RecebivelResponse(UUID id, String ativo,
                                  @Schema(type = "string", example = "15000.00") BigDecimal valorBruto,
                                  Moeda moeda, LocalDate dataVencimento, CategoriaRisco categoriaRisco,
                                  StatusRecebivel status,
@@ -32,7 +32,7 @@ public record RecebivelResponse(UUID id, String cedente,
                                  BigDecimal cotacaoCambio) {
 
     public static RecebivelResponse from(Recebivel recebivel) {
-        return new RecebivelResponse(recebivel.getId(), recebivel.getCedente(), recebivel.getValorBruto(),
+        return new RecebivelResponse(recebivel.getId(), recebivel.getAtivo(), recebivel.getValorBruto(),
                 recebivel.getMoeda(), recebivel.getDataVencimento(), recebivel.getCategoriaRisco(),
                 recebivel.getStatus(), recebivel.getValorPresente(), recebivel.getValorDesagio(),
                 recebivel.getTaxaDescontoAplicada(), recebivel.getMotivoRejeicao(),
@@ -40,7 +40,7 @@ public record RecebivelResponse(UUID id, String cedente,
     }
 
     public static RecebivelResponse from(RecebivelLeitura recebivel) {
-        return new RecebivelResponse(recebivel.id(), recebivel.cedente(), recebivel.valorBruto(),
+        return new RecebivelResponse(recebivel.id(), recebivel.ativo(), recebivel.valorBruto(),
                 recebivel.moeda(), recebivel.dataVencimento(), recebivel.categoriaRisco(),
                 recebivel.status(), recebivel.valorPresente(), recebivel.valorDesagio(),
                 recebivel.taxaDescontoAplicada(), recebivel.motivoRejeicao(),

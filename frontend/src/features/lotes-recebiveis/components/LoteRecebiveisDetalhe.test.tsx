@@ -19,7 +19,7 @@ describe('LoteRecebiveisDetalhe', () => {
       recebiveis: [
         {
           id: 'rec-1',
-          cedente: 'Empresa Alfa',
+          ativo: 'Empresa Alfa',
           valorBruto: '1000.00',
           moeda: 'BRL',
           dataVencimento: '2026-12-31',
@@ -42,6 +42,39 @@ describe('LoteRecebiveisDetalhe', () => {
     expect(screen.getByText('10,50%')).toBeInTheDocument()
   })
 
+  it('mostra o valor presente na moeda de pagamento quando cross-currency', async () => {
+    vi.mocked(api.buscarLoteRecebiveis).mockResolvedValue({
+      id: 'lote-1',
+      dataReferencia: '2026-09-18',
+      status: 'PRECIFICADO',
+      recebiveis: [
+        {
+          id: 'rec-1',
+          ativo: 'Empresa Gama',
+          valorBruto: '1000.00',
+          moeda: 'BRL',
+          dataVencimento: '2026-12-31',
+          categoriaRisco: 'B',
+          status: 'PRECIFICADO',
+          valorPresente: '190.00',
+          valorDesagio: '50.00',
+          taxaDescontoAplicada: '0.105000',
+          moedaPagamento: 'USD',
+          cotacaoCambio: '5.00',
+        },
+      ],
+    })
+
+    renderWithProviders(<LoteRecebiveisDetalhe id="lote-1" />)
+
+    expect(await screen.findByText('Empresa Gama')).toBeInTheDocument()
+    // valorBruto/desagio continuam em BRL, valorPresente na moeda de pagamento (USD)
+    expect(screen.getByText(/R\$\s*1\.000,00/)).toBeInTheDocument()
+    expect(screen.getByText(/US\$\s*190,00/)).toBeInTheDocument()
+    expect(screen.getByText(/R\$\s*50,00/)).toBeInTheDocument()
+    expect(screen.getByText('Dólar (USD)')).toBeInTheDocument()
+  })
+
   it('mostra o motivo quando o recebivel foi rejeitado', async () => {
     vi.mocked(api.buscarLoteRecebiveis).mockResolvedValue({
       id: 'lote-1',
@@ -50,7 +83,7 @@ describe('LoteRecebiveisDetalhe', () => {
       recebiveis: [
         {
           id: 'rec-1',
-          cedente: 'Empresa Beta',
+          ativo: 'Empresa Beta',
           valorBruto: '500.00',
           moeda: 'BRL',
           dataVencimento: '2026-09-18',

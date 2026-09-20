@@ -36,8 +36,9 @@ export function LoteRecebiveisDetalhe({ id }: LoteRecebiveisDetalheProps) {
       <table>
         <thead>
           <tr>
-            <th scope="col">{TEXTOS.detalhe.colunaCedente}</th>
+            <th scope="col">{TEXTOS.detalhe.colunaAtivo}</th>
             <th scope="col">{TEXTOS.detalhe.colunaValorBruto}</th>
+            <th scope="col">{TEXTOS.detalhe.colunaMoedaPagamento}</th>
             <th scope="col">{TEXTOS.detalhe.colunaValorPresente}</th>
             <th scope="col">{TEXTOS.detalhe.colunaDesagio}</th>
             <th scope="col">{TEXTOS.detalhe.colunaTaxa}</th>
@@ -48,9 +49,10 @@ export function LoteRecebiveisDetalhe({ id }: LoteRecebiveisDetalheProps) {
         <tbody>
           {lote.recebiveis?.map((recebivel) => (
             <tr key={recebivel.id}>
-              <td>{recebivel.cedente}</td>
+              <td>{recebivel.ativo}</td>
               <td>{formatarMoeda(recebivel.valorBruto, recebivel.moeda)}</td>
-              <td>{formatarMoeda(recebivel.valorPresente, recebivel.moeda)}</td>
+              <td>{TEXTOS.moedas[recebivel.moedaPagamento ?? 'BRL']}</td>
+              <td>{formatarMoeda(recebivel.valorPresente, recebivel.moedaPagamento ?? recebivel.moeda)}</td>
               <td>{formatarMoeda(recebivel.valorDesagio, recebivel.moeda)}</td>
               <td>{formatarPercentual(recebivel.taxaDescontoAplicada)}</td>
               <td>

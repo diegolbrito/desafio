@@ -36,8 +36,8 @@ public class RecebivelEntity {
     @JoinColumn(name = "lote_recebivel_id", nullable = false)
     private LoteRecebivelEntity loteRecebivel;
 
-    @Column(name = "cedente", nullable = false, length = 255)
-    private String cedente;
+    @Column(name = "ativo", nullable = false, length = 255)
+    private String ativo;
 
     @Column(name = "valor_bruto", nullable = false)
     private BigDecimal valorBruto;
@@ -96,12 +96,12 @@ public class RecebivelEntity {
     protected RecebivelEntity() {
     }
 
-    public RecebivelEntity(String cedente, BigDecimal valorBruto, Moeda moeda, LocalDate dataVencimento,
+    public RecebivelEntity(String ativo, BigDecimal valorBruto, Moeda moeda, LocalDate dataVencimento,
                             CategoriaRisco categoriaRisco, StatusRecebivel status,
                             BigDecimal valorPresente, BigDecimal valorDesagio,
                             BigDecimal taxaDescontoAplicada, String motivoRejeicao,
                             Moeda moedaPagamento, BigDecimal cotacaoCambio) {
-        this.cedente = cedente;
+        this.ativo = ativo;
         this.valorBruto = valorBruto;
         this.moeda = moeda;
         this.dataVencimento = dataVencimento;
@@ -123,8 +123,8 @@ public class RecebivelEntity {
         return id;
     }
 
-    public String getCedente() {
-        return cedente;
+    public String getAtivo() {
+        return ativo;
     }
 
     public BigDecimal getValorBruto() {

@@ -13,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class RecebivelTest {
 
     private Recebivel recebivelValido() {
-        return Recebivel.criar("Cedente Ltda", new BigDecimal("1000.00"), Moeda.BRL,
+        return Recebivel.criar("Duplicata Mercantil", new BigDecimal("1000.00"),
                 LocalDate.of(2026, 12, 31), CategoriaRisco.B);
     }
 
@@ -22,11 +22,19 @@ class RecebivelTest {
         Recebivel recebivel = recebivelValido();
 
         assertThat(recebivel.getStatus()).isEqualTo(StatusRecebivel.PENDENTE);
-        assertThat(recebivel.getCedente()).isEqualTo("Cedente Ltda");
+        assertThat(recebivel.getAtivo()).isEqualTo("Duplicata Mercantil");
     }
 
     @Test
-    void semMoedaPagamentoInformadaAssumeAPropriaMoedaSemCotacao() {
+    void ativoEhSempreDenominadoEmBrl() {
+        Recebivel recebivel = Recebivel.criar("Ativo", new BigDecimal("1000.00"),
+                LocalDate.of(2026, 12, 31), CategoriaRisco.B, Moeda.USD);
+
+        assertThat(recebivel.getMoeda()).isEqualTo(Moeda.BRL);
+    }
+
+    @Test
+    void semMoedaPagamentoInformadaAssumeBrlSemCotacao() {
         Recebivel recebivel = recebivelValido();
 
         assertThat(recebivel.getMoedaPagamento()).isEqualTo(Moeda.BRL);
@@ -34,8 +42,8 @@ class RecebivelTest {
     }
 
     @Test
-    void aceitaMoedaPagamentoDiferenteDaMoedaDoTitulo() {
-        Recebivel recebivel = Recebivel.criar("Cedente", new BigDecimal("1000.00"), Moeda.BRL,
+    void aceitaMoedaPagamentoDiferenteDeBrl() {
+        Recebivel recebivel = Recebivel.criar("Ativo", new BigDecimal("1000.00"),
                 LocalDate.of(2026, 12, 31), CategoriaRisco.B, Moeda.USD);
 
         assertThat(recebivel.getMoedaPagamento()).isEqualTo(Moeda.USD);
@@ -45,21 +53,21 @@ class RecebivelTest {
 
     @Test
     void rejeitaValorBrutoNaoPositivo() {
-        assertThatThrownBy(() -> Recebivel.criar("Cedente", new BigDecimal("0.00"), Moeda.BRL,
+        assertThatThrownBy(() -> Recebivel.criar("Ativo", new BigDecimal("0.00"),
                 LocalDate.of(2026, 12, 31), CategoriaRisco.A))
                 .isInstanceOf(RecebivelInvalidoException.class);
     }
 
     @Test
-    void rejeitaCedenteEmBranco() {
-        assertThatThrownBy(() -> Recebivel.criar("  ", new BigDecimal("100.00"), Moeda.BRL,
+    void rejeitaAtivoEmBranco() {
+        assertThatThrownBy(() -> Recebivel.criar("  ", new BigDecimal("100.00"),
                 LocalDate.of(2026, 12, 31), CategoriaRisco.A))
                 .isInstanceOf(RecebivelInvalidoException.class);
     }
 
     @Test
     void calculaPrazoMesesCorretamenteQuandoExatoEmMesesInteiros() {
-        Recebivel recebivel = Recebivel.criar("Cedente", new BigDecimal("100.00"), Moeda.BRL,
+        Recebivel recebivel = Recebivel.criar("Ativo", new BigDecimal("100.00"),
                 LocalDate.of(2026, 10, 20), CategoriaRisco.A);
 
         long prazo = recebivel.calcularPrazoMeses(LocalDate.of(2026, 9, 20));
@@ -69,7 +77,7 @@ class RecebivelTest {
 
     @Test
     void arredondaMesIncompletoParaCimaComoMesInteiro() {
-        Recebivel recebivel = Recebivel.criar("Cedente", new BigDecimal("100.00"), Moeda.BRL,
+        Recebivel recebivel = Recebivel.criar("Ativo", new BigDecimal("100.00"),
                 LocalDate.of(2026, 11, 5), CategoriaRisco.A);
 
         // 1 mes completo (20/09 -> 20/10) + fracao de mes (20/10 -> 05/11) = arredonda para 2
@@ -80,7 +88,7 @@ class RecebivelTest {
 
     @Test
     void rejeitaPrazoQuandoVencimentoNaoEhPosteriorADataReferencia() {
-        Recebivel recebivel = Recebivel.criar("Cedente", new BigDecimal("100.00"), Moeda.BRL,
+        Recebivel recebivel = Recebivel.criar("Ativo", new BigDecimal("100.00"),
                 LocalDate.of(2026, 9, 20), CategoriaRisco.A);
 
         assertThatThrownBy(() -> recebivel.calcularPrazoMeses(LocalDate.of(2026, 9, 20)))
@@ -106,7 +114,7 @@ class RecebivelTest {
 
     @Test
     void aplicarPrecificacaoComCotacaoSnapshotaACotacaoAplicada() {
-        Recebivel recebivel = Recebivel.criar("Cedente", new BigDecimal("1000.00"), Moeda.BRL,
+        Recebivel recebivel = Recebivel.criar("Ativo", new BigDecimal("1000.00"),
                 LocalDate.of(2026, 12, 31), CategoriaRisco.B, Moeda.USD);
         ResultadoDesagio resultado = new ResultadoDesagio(
                 new BigDecimal("190.00"), new BigDecimal("10.00"), new BigDecimal("0.105000"));

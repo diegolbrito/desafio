@@ -9,7 +9,7 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 /** Projecao somente-leitura de um recebivel persistido, usada pelas consultas (GET). */
-public record RecebivelLeitura(UUID id, String cedente, BigDecimal valorBruto, Moeda moeda,
+public record RecebivelLeitura(UUID id, String ativo, BigDecimal valorBruto, Moeda moeda,
                                 LocalDate dataVencimento, CategoriaRisco categoriaRisco,
                                 StatusRecebivel status, BigDecimal valorPresente,
                                 BigDecimal valorDesagio, BigDecimal taxaDescontoAplicada,

@@ -16,15 +16,15 @@ describe('LoteRecebiveisForm', () => {
     const user = userEvent.setup()
     renderWithProviders(<LoteRecebiveisForm />)
 
-    expect(screen.getAllByLabelText('Cedente')).toHaveLength(1)
+    expect(screen.getAllByLabelText('Ativo')).toHaveLength(1)
     expect(screen.queryByRole('button', { name: 'Remover' })).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: '+ Adicionar recebível' }))
-    expect(screen.getAllByLabelText('Cedente')).toHaveLength(2)
+    expect(screen.getAllByLabelText('Ativo')).toHaveLength(2)
     expect(screen.getAllByRole('button', { name: 'Remover' })).toHaveLength(2)
 
     await user.click(screen.getAllByRole('button', { name: 'Remover' })[0])
-    expect(screen.getAllByLabelText('Cedente')).toHaveLength(1)
+    expect(screen.getAllByLabelText('Ativo')).toHaveLength(1)
   })
 
   it('mostra erros de validacao ao submeter com campos obrigatorios vazios', async () => {
@@ -33,7 +33,7 @@ describe('LoteRecebiveisForm', () => {
 
     await user.click(screen.getByRole('button', { name: 'Precificar lote' }))
 
-    expect(await screen.findByText('Cedente é obrigatório')).toBeInTheDocument()
+    expect(await screen.findByText('Ativo é obrigatório')).toBeInTheDocument()
     expect(screen.getByText('Valor bruto é obrigatório')).toBeInTheDocument()
     expect(screen.getByText('Data de vencimento é obrigatória')).toBeInTheDocument()
     expect(api.criarLoteRecebiveis).not.toHaveBeenCalled()
@@ -43,8 +43,8 @@ describe('LoteRecebiveisForm', () => {
     const user = userEvent.setup()
     renderWithProviders(<LoteRecebiveisForm />)
 
-    await user.type(screen.getByLabelText('Cedente'), 'Empresa Teste')
-    await user.type(screen.getByLabelText('Valor bruto'), '-10')
+    await user.type(screen.getByLabelText('Ativo'), 'Empresa Teste')
+    await user.type(screen.getByLabelText('Valor bruto (R$)'), '-10')
     await user.type(screen.getByLabelText('Data de vencimento'), '2027-01-01')
     await user.click(screen.getByRole('button', { name: 'Precificar lote' }))
 
@@ -64,8 +64,8 @@ describe('LoteRecebiveisForm', () => {
     const user = userEvent.setup()
     renderWithProviders(<LoteRecebiveisForm />)
 
-    await user.type(screen.getByLabelText('Cedente'), 'Empresa Teste')
-    await user.type(screen.getByLabelText('Valor bruto'), '1000.50')
+    await user.type(screen.getByLabelText('Ativo'), 'Empresa Teste')
+    await user.type(screen.getByLabelText('Valor bruto (R$)'), '1000.50')
     await user.type(screen.getByLabelText('Data de vencimento'), '2027-01-01')
     await user.click(screen.getByRole('button', { name: 'Precificar lote' }))
 
@@ -77,9 +77,9 @@ describe('LoteRecebiveisForm', () => {
     expect(vi.mocked(api.criarLoteRecebiveis).mock.calls[0][0]).toEqual({
       recebiveis: [
         {
-          cedente: 'Empresa Teste',
+          ativo: 'Empresa Teste',
           valorBruto: '1000.50',
-          moeda: 'BRL',
+          moedaPagamento: 'BRL',
           dataVencimento: '2027-01-01',
           categoriaRisco: 'B',
         },
@@ -94,8 +94,8 @@ describe('LoteRecebiveisForm', () => {
     const user = userEvent.setup()
     renderWithProviders(<LoteRecebiveisForm />)
 
-    await user.type(screen.getByLabelText('Cedente'), 'Empresa Teste')
-    await user.type(screen.getByLabelText('Valor bruto'), '1000')
+    await user.type(screen.getByLabelText('Ativo'), 'Empresa Teste')
+    await user.type(screen.getByLabelText('Valor bruto (R$)'), '1000')
     await user.type(screen.getByLabelText('Data de vencimento'), '2027-01-01')
     await user.click(screen.getByRole('button', { name: 'Precificar lote' }))
 

@@ -34,29 +34,33 @@ risco do ativo e na moeda de pagamento, e registrar a transação de forma audit
 
   | Categoria | Spread de risco (a.a. de referência) | Spread de risco aplicado (a.m.) |
   |---|---|---|
-  | AA | 1,0%  | 0,0830% |
+  | AA | — (fixado, ver nota) | 1,5000% |
   | A  | 2,0%  | 0,1652% |
   | B  | 3,5%  | 0,2871% |
-  | C  | 5,5%  | 0,4472% |
+  | C  | — (fixado, ver nota) | 2,5000% |
   | D  | 8,0%  | 0,6434% |
   | E  | 12,0% | 0,9489% |
+
+  > **Nota**: AA e C foram fixados diretamente em `0,015000`/`0,025000` (migration `V202609181007`) para reproduzir 3 casos de aferição fornecidos pelo negócio (`CasosAfericaoTest`) — com taxa base de 1% a.m. (ver abaixo), somam exatamente 2,5% a.m. (AA) e 3,5% a.m. (C), as taxas de desconto usadas nesses casos. As demais categorias mantêm a conversão do valor anual de referência do item 1.
 
 - A categoria de risco é **informada na entrada do lote** (campo obrigatório por recebível), não é calculada/derivada de bureau externo no MVP.
 - Cadastrada em tabela de referência (`categoria_risco`), populada via migration Flyway (seed), permitindo evolução futura sem alterar código.
 
 ### 3. Taxa base e câmbio
 - Taxa base por moeda é um proxy de mercado (CDI para BRL, SOFR para USD), cadastrado em tabela de referência (`taxa_base`), com valor vigente definido via seed/migration — sem integração automática com fonte externa no MVP.
-- Valores seed assumidos (referência anual, convertida ao equivalente mensal pela mesma fórmula do item 2): BRL = 10,65% a.a. → 0,8469% a.m.; USD = 4,80% a.a. → 0,3915% a.m.
-- **Câmbio cross-currency (título numa moeda, pagamento em outra)**: cada recebível é precificado inteiramente na sua própria moeda de título (taxaBase/spread daquela moeda) — o cálculo do deságio em si nunca depende de câmbio. Quando o pagamento ocorre numa moeda diferente da do título (campo `moedaPagamento` informado, na entrada do lote, e diferente de `moeda`), o valor final é convertido usando a cotação vigente do sistema. A conversão acontece **ao final**: primeiro calcula-se `valorPresente`/deságio normalmente na moeda do título, e só depois esses valores (e o `valorBruto`, apenas para fins de reconciliação) são convertidos para `moedaPagamento`.
+- Valor seed: **1% a.m. para as duas moedas** (BRL e USD), fixado na migration `V202609181007` — simplificação que substitui os proxies CDI/SOFR convertidos usados antes (10,65%/4,80% a.a.), adotada para reproduzir os mesmos casos de aferição do item 2 (taxa de desconto = taxaBase + spreadRisco).
+- **O ativo é sempre denominado em BRL.** Não existe mais campo `moeda` na entrada do recebível — quem cria o lote (via API ou frontend) só escolhe a `moedaPagamento`. Essa é uma simplificação deliberada do modelo original (que permitia ativo em BRL ou USD): o fundo sempre origina/registra o ativo em reais; a variabilidade de moeda fica inteiramente do lado do pagamento. `Moeda.BRL` é atribuída automaticamente ao ativo na criação do domínio (`Recebivel.criar`), não é mais um dado de entrada — a coluna `moeda` continua existindo no banco (histórico + uso interno para consultar `taxaBase`), mas a aplicação nunca mais grava um valor diferente de `BRL` nela. Linhas antigas com `moeda = 'USD'` (de antes desta decisão) não foram reescritas — são histórico válido de um período em que a regra ainda não existia.
+- **Câmbio cross-currency (ativo em BRL, pagamento em outra moeda)**: o cálculo do deságio é feito inteiramente em BRL (taxaBase/spread) — nunca depende de câmbio. Quando o pagamento ocorre numa moeda diferente de BRL (campo `moedaPagamento` informado e diferente de BRL), o `valorPresente` é convertido usando a cotação vigente do sistema. A conversão acontece **ao final**, e **só sobre o `valorPresente`**: primeiro calcula-se `valorPresente`/deságio normalmente em BRL, e só depois o `valorPresente` é convertido para `moedaPagamento` — representa o valor que de fato será pago, na moeda do pagamento. Como o ativo é sempre BRL, a única direção de conversão possível é BRL → moeda de pagamento (nunca o contrário).
+  - **`deságio` nunca é convertido** — permanece sempre na moeda do título, mesmo quando há cross-currency. Ele representa o custo do desconto no referencial do próprio título (quanto se "perdeu" em relação ao valor de face), não um valor a pagar; converter junto não teria significado de negócio. Validado com casos de aferição fornecidos pelo negócio (ver `CasosAfericaoTest`): um título de R$ 100.000,00/3 meses gera o mesmo deságio em BRL (R$ 7.140,06) esteja ele sendo pago em BRL ou em USD — só o `valorPresente` muda (R$ 92.859,94 vira US$ 17.094,67 à cotação 5,4321).
+  - **Consequência**: o invariante `valorPresente + deságio == valorBruto` só vale quando **não** há cross-currency (mesma moeda). Com conversão, `valorPresente` fica na moeda de pagamento e `valorBruto`/`deságio` continuam na moeda do título — a soma direta dos dois não faz sentido nesse caso (moedas diferentes) e não é mais um invariante esperado.
   - **Cotação como parâmetro de configuração da aplicação** (`credit-engine.cotacao-cambio`, env var `COTACAO_CAMBIO`), mesmo padrão de `custoOperacional` (item 4) — **não** é recebida via API/por recebível. Diferente de `taxaBase`/`spreadRisco` (que também são configuração, mas cadastradas em tabela de referência), a cotação é um único valor de aplicação porque só existem duas moedas (um único par a converter); não há necessidade de tabela de referência para um valor só.
   - Convenção: `cotacaoCambio` é sempre expressa como "quantidade de BRL por 1 USD" (padrão de mercado, ex. PTAX), independente de qual das duas moedas é o título — evita ambiguidade de direção. Simplificação válida enquanto só existem duas moedas (BRL/USD); um terceiro par exigiria revisar essa convenção (provavelmente migrando para tabela de referência por par de moedas).
-  - O invariante de auditoria `valorPresente + deságio == valorBruto` passa a ser garantido em termos da **moeda de pagamento** quando há conversão (ambos os lados convertidos pela mesma cotação, com deságio derivado por subtração após arredondamento — mesma técnica do item 1, para não perder a reconciliação exata por arredondamento). `valorBruto` em si continua exibido/persistido apenas na moeda do título (valor de face contratual); não há coluna redundante para a versão convertida.
   - Moeda de pagamento e a cotação efetivamente usada são "congeladas" (snapshot) no recebível no momento da precificação, pelo mesmo motivo de auditabilidade da taxa base/spread — mesmo sendo hoje um parâmetro único de aplicação, ele pode mudar entre uma precificação e outra (redeploy com novo valor), então o snapshot por recebível continua sendo o que garante a reconstituição exata do cálculo passado.
 - Taxa base e spread de risco aplicados a cada recebível são "congelados" (snapshot) no momento da precificação e registrados na transação, garantindo auditabilidade mesmo que os valores de referência mudem depois.
 
 ### 4. Entrada do lote
 - Entrada via API REST (`POST /api/v1/lotes-recebiveis`), payload com os dados do lote e a lista de recebíveis.
-- Campos do recebível: `cedente` (texto livre/referência — ver item 7), `valorBruto`, `moeda`, `dataVencimento`, `categoriaRisco`.
+- Campos do recebível: `ativo` (texto livre/referência — ver item 7), `valorBruto`, `dataVencimento`, `categoriaRisco`, `moedaPagamento` (opcional — ver item 3; não há campo `moeda`, o ativo é sempre BRL).
 - Custo operacional aplicado como spread fixo adicional (valor de referência: 0,5% a.a. → 0,0416% a.m.), configurado na aplicação (não em banco), por ser parâmetro estável.
 
 ### 5. Fluxo de aprovação
@@ -68,8 +72,8 @@ risco do ativo e na moeda de pagamento, e registrar a transação de forma audit
 - Fluxo implementado: **cadastrar lote → precificar (calcular deságio) → registrar transação de forma auditável**.
 - Aprovação, liquidação/pagamento ao cedente, liquidação parcial, cancelamento e recompra ficam **fora do escopo** deste desafio.
 
-### 7. Cadastro de cedente
-- Cedente é um campo de referência (texto) no recebível, **sem entidade/cadastro próprio** no MVP.
+### 7. Cadastro do ativo
+- O campo foi renomeado de `cedente` para `ativo` (mais fiel ao que de fato é preenchido nos exemplos — o tipo/instrumento do recebível, ex.: "Duplicata Mercantil", "Cheque Pré-datado", não o nome da empresa cedente). Continua um campo de referência (texto livre), **sem entidade/cadastro próprio** no MVP.
 
 ### 8. Escala decimal de valores monetários
 - A seção "Decisões de precisão numérica" (2 casas decimais) e a tabela "Tipos de dados canônicos" (`numeric(19,2)`) estavam em contradição. Decisão: prevalece **2 casas decimais** (`numeric(19,2)`) para todo valor monetário, em todas as camadas — inclusive `valorPresente` e `deságio` calculados. A tabela de tipos canônicos e o exemplo de campo foram corrigidos para `numeric(19,2)` / `"15000.00"`.
@@ -117,7 +121,7 @@ risco do ativo e na moeda de pagamento, e registrar a transação de forma audit
 | React (componente/prop/state) | PascalCase / camelCase | `RecebivelCard`, `valorBruto` |
 | Enums                 | UPPER_SNAKE em todas as camadas | `PENDENTE`, `LIQUIDADO` |
 
-- Idioma dos nomes de domínio: português (`cedente`, `desagio`, `lote`); nomes técnicos em inglês (`createdAt`, `id`, `status`).
+- Idioma dos nomes de domínio: português (`ativo`, `desagio`, `lote`); nomes técnicos em inglês (`createdAt`, `id`, `status`).
 - Nunca abreviar (`valor`, não `vlr`; `quantidade`, não `qtd`).
 - Booleanos com prefixo: `ativo`, `is...` não é usado.
 
@@ -218,7 +222,7 @@ Campo "valor bruto do recebível":
     duplicam esse log.
   - **Aplicação/casos de uso**: início e resultado das operações de negócio principais em `INFO`
     (ex.: `PrecificarLoteService`), decisões/rejeições pontuais em `DEBUG`. Nunca loga o valor de
-    campos de negócio (cedente, valores monetários) nessas linhas — só identificadores, contagens
+    campos de negócio (ativo, valores monetários) nessas linhas — só identificadores, contagens
     e status.
   - **Persistência/JPA**: a aplicação não loga SQL nem erros de conexão manualmente — Hibernate
     já expõe isso via `org.hibernate.SQL`/`org.hibernate.orm.jdbc.bind` (só no perfil `dev`), e
@@ -237,7 +241,7 @@ Campo "valor bruto do recebível":
   requisições caso a aplicação venha a rodar em virtual threads no futuro.
 - **Dados sensíveis**: nunca logar senhas, tokens, CPF/CNPJ, nem dados bancários ou de cartão. Como
   este projeto não lida com esses dados hoje, a regra prática é: valores monetários e identificação
-  do cedente só aparecem na resposta HTTP, nunca em linha de log.
+  do ativo só aparecem na resposta HTTP, nunca em linha de log.
 - **SQL em desenvolvimento**: dentro de `<springProfile name="dev">` no `logback-spring.xml`, o
   logger `org.hibernate.SQL` fica em `DEBUG` (mostra a query) e `org.hibernate.orm.jdbc.bind` em
   `TRACE` (mostra os parâmetros vinculados). Ativa automaticamente ao subir com

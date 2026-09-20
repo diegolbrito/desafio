@@ -66,7 +66,7 @@ public class LoteRecebiveisQueryAdapter implements ListarLotesRecebiveisPort, Bu
     }
 
     private RecebivelLeitura paraRecebivelLeitura(RecebivelEntity entity) {
-        return new RecebivelLeitura(entity.getId(), entity.getCedente(), entity.getValorBruto(), entity.getMoeda(),
+        return new RecebivelLeitura(entity.getId(), entity.getAtivo(), entity.getValorBruto(), entity.getMoeda(),
                 entity.getDataVencimento(), entity.getCategoriaRisco(), entity.getStatus(), entity.getValorPresente(),
                 entity.getValorDesagio(), entity.getTaxaDescontoAplicada(), entity.getMotivoRejeicao(),
                 entity.getMoedaPagamento(), entity.getCotacaoCambio());

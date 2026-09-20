@@ -18,18 +18,23 @@ body:json {
   {
     "recebiveis": [
       {
-        "cedente": "Empresa Alfa Ltda",
-        "valorBruto": "10000.00",
-        "moeda": "BRL",
-        "dataVencimento": "2027-01-01",
-        "categoriaRisco": "B"
+        "ativo": "Duplicata Mercantil",
+        "valorBruto": "100000.00",
+        "dataVencimento": "2026-12-18",
+        "categoriaRisco": "AA"
       },
       {
-        "cedente": "Empresa Beta Inc",
-        "valorBruto": "5000.00",
-        "moeda": "USD",
-        "dataVencimento": "2027-02-15",
-        "categoriaRisco": "AA"
+        "ativo": "Cheque Pré-datado",
+        "valorBruto": "25000.00",
+        "dataVencimento": "2026-11-18",
+        "categoriaRisco": "C"
+      },
+      {
+        "ativo": "Duplicata Mercantil (paga em USD)",
+        "valorBruto": "100000.00",
+        "dataVencimento": "2026-12-18",
+        "categoriaRisco": "AA",
+        "moedaPagamento": "USD"
       }
     ]
   }
@@ -39,4 +44,10 @@ docs {
   Cria e precifica um lote de recebiveis. Retorna 201 mesmo se algum item for
   rejeitado individualmente (confira o campo `status` de cada recebivel na
   resposta). Copie o `id` do lote retornado para usar em "Buscar lote por id".
+
+  O ativo e' sempre denominado em BRL (ver SPEC.md, "Premissas adotadas" item
+  3) - nao ha campo `moeda` no payload. `moedaPagamento` e' opcional; quando
+  omitido (2 primeiros itens), o pagamento e' na propria moeda do ativo (BRL).
+  O terceiro item mostra cross-currency (paga em USD) - use "Criar lote
+  (cross-currency)" para mais detalhes sobre esse cenario.
 }

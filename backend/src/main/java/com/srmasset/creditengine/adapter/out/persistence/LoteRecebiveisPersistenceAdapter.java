@@ -46,7 +46,7 @@ public class LoteRecebiveisPersistenceAdapter implements SalvarLoteRecebiveisPor
 
     private RecebivelEntity paraEntity(Recebivel recebivel) {
         return new RecebivelEntity(
-                recebivel.getCedente(), recebivel.getValorBruto(), recebivel.getMoeda(),
+                recebivel.getAtivo(), recebivel.getValorBruto(), recebivel.getMoeda(),
                 recebivel.getDataVencimento(), recebivel.getCategoriaRisco(), recebivel.getStatus(),
                 recebivel.getValorPresente(), recebivel.getValorDesagio(),
                 recebivel.getTaxaDescontoAplicada(), recebivel.getMotivoRejeicao(),

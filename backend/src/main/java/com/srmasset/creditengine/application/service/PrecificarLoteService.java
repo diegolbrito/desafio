@@ -69,7 +69,7 @@ public class PrecificarLoteService implements PrecificarLoteUseCase {
         LocalDate dataReferencia = LocalDate.now(clock);
 
         List<Recebivel> recebiveis = comando.recebiveis().stream()
-                .map(r -> Recebivel.criar(r.cedente(), r.valorBruto(), r.moeda(), r.dataVencimento(), r.categoriaRisco(),
+                .map(r -> Recebivel.criar(r.ativo(), r.valorBruto(), r.dataVencimento(), r.categoriaRisco(),
                         r.moedaPagamento()))
                 .toList();
 
@@ -104,8 +104,7 @@ public class PrecificarLoteService implements PrecificarLoteUseCase {
                     recebivel.getValorBruto(), prazoMeses,
                     taxaBase, spreadRisco, custoOperacionalPadrao);
             boolean crossCurrency = recebivel.getMoedaPagamento() != recebivel.getMoeda();
-            resultado = conversorCambial.converter(resultado, recebivel.getValorBruto(),
-                    recebivel.getMoeda(), recebivel.getMoedaPagamento(), cotacaoCambioPadrao);
+            resultado = conversorCambial.converter(resultado, recebivel.getMoedaPagamento(), cotacaoCambioPadrao);
             recebivel.aplicarPrecificacao(resultado, crossCurrency ? cotacaoCambioPadrao : null);
         } catch (PrazoInvalidoException e) {
             recebivel.rejeitar(e.getMessage());

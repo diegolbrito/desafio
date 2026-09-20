@@ -49,7 +49,7 @@ class LoteRecebiveisControllerIntegrationTest {
                 {
                   "recebiveis": [
                     {
-                      "cedente": "Cedente A",
+                      "ativo": "Ativo A",
                       "valorBruto": "1000.00",
                       "moeda": "BRL",
                       "dataVencimento": "%s",
@@ -79,14 +79,14 @@ class LoteRecebiveisControllerIntegrationTest {
                 {
                   "recebiveis": [
                     {
-                      "cedente": "Cedente Invalido",
+                      "ativo": "Ativo Invalido",
                       "valorBruto": "500.00",
                       "moeda": "BRL",
                       "dataVencimento": "%s",
                       "categoriaRisco": "A"
                     },
                     {
-                      "cedente": "Cedente Valido",
+                      "ativo": "Ativo Valido",
                       "valorBruto": "500.00",
                       "moeda": "BRL",
                       "dataVencimento": "%s",
@@ -122,7 +122,7 @@ class LoteRecebiveisControllerIntegrationTest {
                 {
                   "recebiveis": [
                     {
-                      "cedente": "Cedente A",
+                      "ativo": "Ativo A",
                       "valorBruto": "-10.00",
                       "moeda": "BRL",
                       "dataVencimento": "%s",
@@ -151,7 +151,7 @@ class LoteRecebiveisControllerIntegrationTest {
                 {
                   "recebiveis": [
                     {
-                      "cedente": "Cedente Consulta",
+                      "ativo": "Ativo Consulta",
                       "valorBruto": "2000.00",
                       "moeda": "USD",
                       "dataVencimento": "%s",
@@ -169,7 +169,7 @@ class LoteRecebiveisControllerIntegrationTest {
 
         mockMvc.perform(get(location))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.recebiveis[0].cedente").value("Cedente Consulta"));
+                .andExpect(jsonPath("$.recebiveis[0].ativo").value("Ativo Consulta"));
 
         mockMvc.perform(get("/api/v1/lotes-recebiveis").param("page", "0").param("size", "20"))
                 .andExpect(status().isOk())
