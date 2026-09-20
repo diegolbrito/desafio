@@ -54,6 +54,10 @@ docker compose down -v    # idem, mas também apaga o volume do banco (reset tot
 | Backend direto | http://localhost:8080/api/v1/lotes-recebiveis |
 | Swagger UI | http://localhost:8080/swagger-ui/index.html |
 | OpenAPI JSON/YAML | http://localhost:8080/v3/api-docs ou `/v3/api-docs.yaml` |
+| Métricas (Prometheus format) | http://localhost:8080/actuator/prometheus |
+| Health check | http://localhost:8080/actuator/health |
+| Prometheus | http://localhost:9090 |
+| Grafana (dashboard "SRM Credit Engine" já provisionado) | http://localhost:3001 |
 
 ## Chamando a API (Bruno)
 

@@ -1,5 +1,6 @@
 package com.srmasset.creditengine.application.service;
 
+import com.srmasset.creditengine.application.metrics.CreditEngineMetrics;
 import com.srmasset.creditengine.application.port.in.LiquidarRecebivelUseCase;
 import com.srmasset.creditengine.application.port.out.LiquidarRecebivelPort;
 import com.srmasset.creditengine.application.port.out.RegistrarEventoTransacaoPort;
@@ -28,13 +29,16 @@ public class LiquidarRecebivelService implements LiquidarRecebivelUseCase {
     private final LiquidarRecebivelPort liquidarRecebivelPort;
     private final RegistrarEventoTransacaoPort registrarEventoPort;
     private final Clock clock;
+    private final CreditEngineMetrics metrics;
 
     public LiquidarRecebivelService(LiquidarRecebivelPort liquidarRecebivelPort,
                                      RegistrarEventoTransacaoPort registrarEventoPort,
-                                     Clock clock) {
+                                     Clock clock,
+                                     CreditEngineMetrics metrics) {
         this.liquidarRecebivelPort = liquidarRecebivelPort;
         this.registrarEventoPort = registrarEventoPort;
         this.clock = clock;
+        this.metrics = metrics;
     }
 
     @Override
@@ -51,6 +55,7 @@ public class LiquidarRecebivelService implements LiquidarRecebivelUseCase {
 
         if (liquidadoAgora) {
             registrarEventoPort.registrar(EventoTransacao.recebivelLiquidado(loteId, recebivel, agora));
+            metrics.registrarRecebivelLiquidado(recebivel.getValorPresente(), recebivel.getMoedaPagamento());
             log.info("Recebivel {} liquidado", recebivelId);
         } else {
             log.info("Recebivel {} ja estava liquidado - requisicao idempotente, sem novo efeito", recebivelId);

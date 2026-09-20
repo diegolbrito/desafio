@@ -1,5 +1,6 @@
 package com.srmasset.creditengine.application.service;
 
+import com.srmasset.creditengine.application.metrics.CreditEngineMetrics;
 import com.srmasset.creditengine.application.port.out.LiquidarRecebivelPort;
 import com.srmasset.creditengine.application.port.out.RegistrarEventoTransacaoPort;
 import com.srmasset.creditengine.domain.CategoriaRisco;
@@ -8,6 +9,7 @@ import com.srmasset.creditengine.domain.Recebivel;
 import com.srmasset.creditengine.domain.ResultadoDesagio;
 import com.srmasset.creditengine.domain.StatusRecebivel;
 import com.srmasset.creditengine.domain.TipoEventoTransacao;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -40,11 +42,14 @@ class LiquidarRecebivelServiceTest {
     @Mock
     private RegistrarEventoTransacaoPort registrarEventoPort;
 
+    private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+
     private LiquidarRecebivelService service;
 
     @BeforeEach
     void setUp() {
-        service = new LiquidarRecebivelService(liquidarRecebivelPort, registrarEventoPort, RELOGIO_FIXO);
+        service = new LiquidarRecebivelService(liquidarRecebivelPort, registrarEventoPort, RELOGIO_FIXO,
+                new CreditEngineMetrics(meterRegistry));
     }
 
     private Recebivel recebivelPrecificado() {
@@ -86,6 +91,9 @@ class LiquidarRecebivelServiceTest {
         assertThat(eventoCaptor.getValue().tipo()).isEqualTo(TipoEventoTransacao.RECEBIVEL_LIQUIDADO);
         assertThat(eventoCaptor.getValue().loteId()).isEqualTo(loteId);
         assertThat(eventoCaptor.getValue().recebivelId()).isEqualTo(recebivel.getId());
+
+        assertThat(meterRegistry.counter("creditengine.recebiveis.liquidados", "moeda", "BRL").count())
+                .isEqualTo(1.0);
     }
 
     @Test
@@ -102,5 +110,9 @@ class LiquidarRecebivelServiceTest {
         verify(registrarEventoPort, never()).registrar(any());
         // salvar() ainda e' chamado (idempotente/sem efeito no banco via dirty-checking), mas sem novo evento
         verify(liquidarRecebivelPort, times(1)).salvar(recebivel);
+
+        // requisicao repetida nao pode inflar a metrica de negocio, igual ao evento de auditoria
+        assertThat(meterRegistry.counter("creditengine.recebiveis.liquidados", "moeda", "BRL").count())
+                .isEqualTo(0.0);
     }
 }

@@ -1,5 +1,6 @@
 package com.srmasset.creditengine.config;
 
+import com.srmasset.creditengine.application.metrics.CreditEngineMetrics;
 import com.srmasset.creditengine.application.port.in.BuscarLoteRecebiveisUseCase;
 import com.srmasset.creditengine.application.port.in.LiquidarRecebivelUseCase;
 import com.srmasset.creditengine.application.port.in.ListarLotesRecebiveisUseCase;
@@ -15,6 +16,7 @@ import com.srmasset.creditengine.application.service.BuscarLoteRecebiveisService
 import com.srmasset.creditengine.application.service.LiquidarRecebivelService;
 import com.srmasset.creditengine.application.service.ListarLotesRecebiveisService;
 import com.srmasset.creditengine.application.service.PrecificarLoteService;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -37,6 +39,11 @@ public class UseCaseConfig {
     }
 
     @Bean
+    public CreditEngineMetrics creditEngineMetrics(MeterRegistry registry) {
+        return new CreditEngineMetrics(registry);
+    }
+
+    @Bean
     public PrecificarLoteUseCase precificarLoteUseCase(
             TaxaBaseRepositoryPort taxaBaseRepository,
             CategoriaRiscoRepositoryPort categoriaRiscoRepository,
@@ -44,9 +51,10 @@ public class UseCaseConfig {
             RegistrarEventoTransacaoPort registrarEventoPort,
             @Value("${credit-engine.custo-operacional}") BigDecimal custoOperacionalPadrao,
             @Value("${credit-engine.cotacao-cambio}") BigDecimal cotacaoCambioPadrao,
-            Clock clock) {
+            Clock clock,
+            CreditEngineMetrics metrics) {
         return new PrecificarLoteService(taxaBaseRepository, categoriaRiscoRepository,
-                salvarLotePort, registrarEventoPort, custoOperacionalPadrao, cotacaoCambioPadrao, clock);
+                salvarLotePort, registrarEventoPort, custoOperacionalPadrao, cotacaoCambioPadrao, clock, metrics);
     }
 
     @Bean
@@ -62,7 +70,8 @@ public class UseCaseConfig {
     @Bean
     public LiquidarRecebivelUseCase liquidarRecebivelUseCase(LiquidarRecebivelPort liquidarRecebivelPort,
                                                                RegistrarEventoTransacaoPort registrarEventoPort,
-                                                               Clock clock) {
-        return new LiquidarRecebivelService(liquidarRecebivelPort, registrarEventoPort, clock);
+                                                               Clock clock,
+                                                               CreditEngineMetrics metrics) {
+        return new LiquidarRecebivelService(liquidarRecebivelPort, registrarEventoPort, clock, metrics);
     }
 }

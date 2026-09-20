@@ -3,6 +3,7 @@ package com.srmasset.creditengine.adapter.out.persistence;
 import com.srmasset.creditengine.adapter.out.persistence.entity.TransacaoEventoEntity;
 import com.srmasset.creditengine.adapter.out.persistence.repository.LoteRecebivelJpaRepository;
 import com.srmasset.creditengine.adapter.out.persistence.repository.TransacaoEventoJpaRepository;
+import com.srmasset.creditengine.application.metrics.CreditEngineMetrics;
 import com.srmasset.creditengine.application.port.in.ComandoPrecificarLote;
 import com.srmasset.creditengine.application.service.PrecificarLoteService;
 import com.srmasset.creditengine.domain.CategoriaRisco;
@@ -14,6 +15,7 @@ import com.srmasset.creditengine.domain.ResultadoDesagio;
 import com.srmasset.creditengine.domain.StatusLote;
 import com.srmasset.creditengine.domain.StatusRecebivel;
 import com.srmasset.creditengine.domain.TipoEventoTransacao;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -139,7 +141,8 @@ class PersistenciaIntegrationTest {
     void precificaLoteCompletoUsandoAdaptersReais() {
         PrecificarLoteService service = new PrecificarLoteService(
                 taxaBaseAdapter, categoriaRiscoAdapter, loteAdapter, eventoAdapter,
-                new BigDecimal("0.005"), new BigDecimal("5.20"), Clock.systemUTC());
+                new BigDecimal("0.005"), new BigDecimal("5.20"), Clock.systemUTC(),
+                new CreditEngineMetrics(new SimpleMeterRegistry()));
 
         ComandoPrecificarLote comando = new ComandoPrecificarLote(List.of(
                 new ComandoPrecificarLote.ComandoRecebivel("Ativo Integracao", new BigDecimal("5000.00"),

@@ -42,5 +42,34 @@ services:
     depends_on:
       - backend
 
+  prometheus:
+    image: prom/prometheus:v3.0.1
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      - backend
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    environment:
+      # Sem autenticacao nas APIs (SPEC.md, "Seguranca") - coerente manter o
+      # Grafana local tambem sem login, so' para uso em desenvolvimento.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+
 volumes:
   db_data:
+  prometheus_data:
+  grafana_data:
