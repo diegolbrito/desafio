@@ -28,7 +28,3 @@ credit-engine:
     # Origens do frontend autorizadas a chamar a API (politica de navegador,
     # nao autenticacao). Lista separada por virgula.
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
-
-logging:
-  pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%X{correlationId}] %logger{36} - %msg%n"

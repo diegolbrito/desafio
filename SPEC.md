@@ -189,6 +189,59 @@ Campo "valor bruto do recebível":
 - Testes de integração para os adapters, rodando dentro do Docker.
 - Trate erros de forma explícita, com mapeamento de exceções de domínio para respostas HTTP adequadas.
 
+**Logging**:
+- **API**: código da aplicação usa sempre `org.slf4j.Logger`/`LoggerFactory` (nunca classes do
+  Logback diretamente) — é o padrão do Spring Boot e mantém o domínio/aplicação livres de
+  acoplamento a uma implementação concreta de logging.
+- **Backend**: [Logback](https://logback.qos.ch/), o padrão do Spring Boot (já vem via
+  `spring-boot-starter-logging`, sem dependência extra no `pom.xml`). Escolhido por ser a opção
+  "batteries included" do framework — zero configuração de dependências, boa integração com
+  `springProperty`/`springProfile` no XML, e suficiente para as necessidades deste projeto (não
+  há requisito de throughput que justifique trocar por uma alternativa).
+- **Saída**: exclusivamente console/stdout (`ConsoleAppender`), sem arquivo de log. Em container,
+  a coleta é responsabilidade do runtime/orquestrador (Docker, Kubernetes, etc.), não da
+  aplicação — mesmo raciocínio de "nada é escrito em disco pela aplicação" já usado para outros
+  aspectos deste projeto.
+- **Configuração**: `backend/src/main/resources/logback-spring.xml` (nome com sufixo `-spring` de
+  propósito, para habilitar `springProperty`/`springProfile`, que só funcionam nesse arquivo).
+- **Níveis por pacote/biblioteca**:
+  - Pacote raiz da aplicação (`com.srmasset.creditengine`): `DEBUG`.
+  - `org.springframework`, `org.hibernate`, `com.zaxxer.hikari`, `org.postgresql`: `WARN`
+    (bibliotecas de infraestrutura só devem aparecer no log quando algo sai do esperado).
+  - Root: `INFO`.
+- **Onde loga cada camada**:
+  - **Startup**: um `INFO` após `ApplicationReadyEvent`, com perfil ativo e porta.
+  - **Entrada HTTP**: um único ponto central (`CorrelationIdFilter`, adapter de entrada) loga
+    método, rota, status e duração de cada requisição em `INFO` — controllers individuais nunca
+    duplicam esse log.
+  - **Aplicação/casos de uso**: início e resultado das operações de negócio principais em `INFO`
+    (ex.: `PrecificarLoteService`), decisões/rejeições pontuais em `DEBUG`. Nunca loga o valor de
+    campos de negócio (cedente, valores monetários) nessas linhas — só identificadores, contagens
+    e status.
+  - **Persistência/JPA**: a aplicação não loga SQL nem erros de conexão manualmente — Hibernate
+    já expõe isso via `org.hibernate.SQL`/`org.hibernate.orm.jdbc.bind` (só no perfil `dev`), e
+    falhas de acesso a dados que não forem tratadas como regra de negócio sobem até o
+    `GlobalExceptionHandler`, que loga o erro uma única vez. Adapters de persistência não
+    implementam "loga e relança".
+  - **Erros/exceções**: centralizados no `GlobalExceptionHandler`. Erros 4xx (validação, regra de
+    negócio violada, recurso não encontrado, conflito de versão) em `WARN`, sem stacktrace — são
+    esperados/causados pelo cliente, não falhas do sistema. Erros 5xx em `ERROR`, com a exceção
+    completa como último argumento do log. Cada erro é logado uma única vez, no handler; camadas
+    inferiores não devem logar a mesma exceção antes de relançá-la.
+- **Correlation id / MDC**: todo log dentro do ciclo de uma requisição carrega
+  `X-Correlation-Id` (gerado se ausente — ver `CorrelationIdFilter`) via MDC (`%X{correlationId}`
+  no pattern), permitindo juntar todas as linhas de uma mesma requisição. O MDC é sempre limpo no
+  `finally` do filtro, mesmo em caso de exceção — importante para não vazar contexto entre
+  requisições caso a aplicação venha a rodar em virtual threads no futuro.
+- **Dados sensíveis**: nunca logar senhas, tokens, CPF/CNPJ, nem dados bancários ou de cartão. Como
+  este projeto não lida com esses dados hoje, a regra prática é: valores monetários e identificação
+  do cedente só aparecem na resposta HTTP, nunca em linha de log.
+- **SQL em desenvolvimento**: dentro de `<springProfile name="dev">` no `logback-spring.xml`, o
+  logger `org.hibernate.SQL` fica em `DEBUG` (mostra a query) e `org.hibernate.orm.jdbc.bind` em
+  `TRACE` (mostra os parâmetros vinculados). Ativa automaticamente ao subir com
+  `SPRING_PROFILES_ACTIVE=dev` ou `--spring.profiles.active=dev`, sem editar o arquivo. Por
+  logar os parâmetros de verdade, esse nível **nunca** deve ser usado em produção.
+
 ## Arquitetura Frontend e decisões
 
 Construa uma Single Page Application seguindo boas práticas modernas:

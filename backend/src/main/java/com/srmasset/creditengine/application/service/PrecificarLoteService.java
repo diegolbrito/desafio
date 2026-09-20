@@ -15,6 +15,8 @@ import com.srmasset.creditengine.domain.exception.PrazoInvalidoException;
 import com.srmasset.creditengine.domain.ResultadoDesagio;
 import com.srmasset.creditengine.domain.StatusLote;
 import com.srmasset.creditengine.domain.StatusRecebivel;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -29,6 +31,8 @@ import java.util.List;
  * persiste o resultado e registra os eventos de auditoria.
  */
 public class PrecificarLoteService implements PrecificarLoteUseCase {
+
+    private static final Logger log = LoggerFactory.getLogger(PrecificarLoteService.class);
 
     private final CalculadoraDesagio calculadora = new CalculadoraDesagio();
 
@@ -55,6 +59,8 @@ public class PrecificarLoteService implements PrecificarLoteUseCase {
 
     @Override
     public LoteRecebiveis precificar(ComandoPrecificarLote comando) {
+        log.info("Iniciando precificacao de lote com {} recebivel(is)", comando.recebiveis().size());
+
         LocalDate dataReferencia = LocalDate.now(clock);
 
         List<Recebivel> recebiveis = comando.recebiveis().stream()
@@ -72,10 +78,14 @@ public class PrecificarLoteService implements PrecificarLoteUseCase {
         } catch (ReferenciaNaoEncontradaException e) {
             lote.marcarErro();
             motivoErro = e.getMessage();
+            log.warn("Lote marcado com ERRO por referencia de taxa/spread ausente: {}", motivoErro);
         }
 
         LoteRecebiveis loteSalvo = salvarLotePort.salvar(lote);
         registrarEventos(loteSalvo, motivoErro);
+
+        log.info("Lote {} precificado: status={}, {} recebivel(is)",
+                loteSalvo.getId(), loteSalvo.getStatus(), loteSalvo.getRecebiveis().size());
         return loteSalvo;
     }
 
@@ -90,6 +100,7 @@ public class PrecificarLoteService implements PrecificarLoteUseCase {
             recebivel.aplicarPrecificacao(resultado);
         } catch (PrazoInvalidoException e) {
             recebivel.rejeitar(e.getMessage());
+            log.debug("Recebivel rejeitado por prazo invalido: motivo={}", e.getMessage());
         }
     }
 

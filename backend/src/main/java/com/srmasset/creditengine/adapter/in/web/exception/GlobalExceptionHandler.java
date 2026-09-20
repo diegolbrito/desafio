@@ -21,6 +21,12 @@ import java.util.Map;
  * Mapeia excecoes para respostas RFC 9457 (Problem Details), conforme
  * SPEC.md "API (REST)". Mensagens em portugues; o correlationId ja esta no
  * MDC (ver CorrelationIdFilter) e portanto aparece nos logs automaticamente.
+ *
+ * <p>Ponto central de log de erro (ver SPEC.md > "Logging"): 4xx (validacao,
+ * regra de negocio, nao encontrado, conflito) em WARN sem stacktrace - sao
+ * erros esperados/do cliente, nao falhas do sistema; 500 em ERROR com a
+ * excecao completa. Cada erro e' logado uma unica vez, aqui - as camadas
+ * inferiores nao devem logar e relancar.
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -38,6 +44,9 @@ public class GlobalExceptionHandler {
                 .map(fe -> Map.of("field", fe.getField(), "message", String.valueOf(fe.getDefaultMessage())))
                 .toList();
         problem.setProperty("errors", erros);
+
+        log.warn("Validacao falhou: {} {} - {} campo(s) invalido(s)",
+                request.getMethod(), request.getRequestURI(), erros.size());
         return problem;
     }
 
@@ -47,6 +56,8 @@ public class GlobalExceptionHandler {
                 "Corpo da requisicao ausente ou mal formado");
         problem.setTitle("Requisicao invalida");
         problem.setInstance(URI.create(request.getRequestURI()));
+
+        log.warn("JSON invalido: {} {}", request.getMethod(), request.getRequestURI());
         return problem;
     }
 
@@ -55,6 +66,8 @@ public class GlobalExceptionHandler {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
         problem.setTitle("Parametro invalido");
         problem.setInstance(URI.create(request.getRequestURI()));
+
+        log.warn("Parametro invalido: {} {} - {}", request.getMethod(), request.getRequestURI(), ex.getMessage());
         return problem;
     }
 
@@ -63,6 +76,8 @@ public class GlobalExceptionHandler {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
         problem.setTitle("Recurso nao encontrado");
         problem.setInstance(URI.create(request.getRequestURI()));
+
+        log.warn("Recurso nao encontrado: {} {} - {}", request.getMethod(), request.getRequestURI(), ex.getMessage());
         return problem;
     }
 
@@ -71,6 +86,8 @@ public class GlobalExceptionHandler {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_CONTENT, ex.getMessage());
         problem.setTitle("Regra de negocio violada");
         problem.setInstance(URI.create(request.getRequestURI()));
+
+        log.warn("Regra de negocio violada: {} {} - {}", request.getMethod(), request.getRequestURI(), ex.getMessage());
         return problem;
     }
 
@@ -80,6 +97,8 @@ public class GlobalExceptionHandler {
                 "O recurso foi modificado por outra operacao. Recarregue e tente novamente.");
         problem.setTitle("Conflito de versao");
         problem.setInstance(URI.create(request.getRequestURI()));
+
+        log.warn("Conflito de versao (optimistic locking): {} {}", request.getMethod(), request.getRequestURI());
         return problem;
     }
 
