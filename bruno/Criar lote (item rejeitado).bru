@@ -1,0 +1,43 @@
+meta {
+  name: Criar lote (item rejeitado)
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/lotes-recebiveis
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "recebiveis": [
+      {
+        "cedente": "Empresa com vencimento vencido",
+        "valorBruto": "1000.00",
+        "moeda": "BRL",
+        "dataVencimento": "2020-01-01",
+        "categoriaRisco": "A"
+      },
+      {
+        "cedente": "Empresa valida",
+        "valorBruto": "1000.00",
+        "moeda": "BRL",
+        "dataVencimento": "2027-06-01",
+        "categoriaRisco": "A"
+      }
+    ]
+  }
+}
+
+docs {
+  Demonstra a regra de rejeicao por item (SPEC.md, Premissa 5): o primeiro
+  recebivel tem data de vencimento no passado e volta com status REJEITADO +
+  motivoRejeicao, mas o lote inteiro ainda e' criado (201) e o segundo item e'
+  precificado normalmente.
+}

@@ -1,0 +1,20 @@
+meta {
+  name: Buscar lote por id
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/v1/lotes-recebiveis/:id
+  body: none
+  auth: none
+}
+
+params:path {
+  id: 00000000-0000-0000-0000-000000000000
+}
+
+docs {
+  Troque o valor de "id" (aba Params) pelo id retornado por "Criar lote" ou por
+  um item de "Listar lotes". Retorna 404 (Problem Details) se o id nao existir.
+}

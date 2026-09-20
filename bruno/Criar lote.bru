@@ -1,0 +1,42 @@
+meta {
+  name: Criar lote
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/lotes-recebiveis
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "recebiveis": [
+      {
+        "cedente": "Empresa Alfa Ltda",
+        "valorBruto": "10000.00",
+        "moeda": "BRL",
+        "dataVencimento": "2027-01-01",
+        "categoriaRisco": "B"
+      },
+      {
+        "cedente": "Empresa Beta Inc",
+        "valorBruto": "5000.00",
+        "moeda": "USD",
+        "dataVencimento": "2027-02-15",
+        "categoriaRisco": "AA"
+      }
+    ]
+  }
+}
+
+docs {
+  Cria e precifica um lote de recebiveis. Retorna 201 mesmo se algum item for
+  rejeitado individualmente (confira o campo `status` de cada recebivel na
+  resposta). Copie o `id` do lote retornado para usar em "Buscar lote por id".
+}
