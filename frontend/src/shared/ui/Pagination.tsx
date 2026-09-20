@@ -1,5 +1,4 @@
-import { Button } from './Button'
-import styles from './Pagination.module.css'
+import { Button } from '@/components/ui/button'
 
 interface PaginationProps {
   page: number
@@ -19,10 +18,10 @@ export function Pagination({
   textoPagina,
 }: PaginationProps) {
   return (
-    <nav aria-label={textoPagina} className={styles.pagination}>
+    <nav aria-label={textoPagina} className="flex items-center gap-4 text-sm text-muted-foreground">
       <Button
         type="button"
-        variant="secondary"
+        variant="outline"
         disabled={page <= 0}
         onClick={() => onPageChange(page - 1)}
       >
@@ -33,7 +32,7 @@ export function Pagination({
       </span>
       <Button
         type="button"
-        variant="secondary"
+        variant="outline"
         disabled={page + 1 >= totalPages}
         onClick={() => onPageChange(page + 1)}
       >

@@ -1,3 +1,4 @@
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Alert } from '../../../shared/ui/Alert'
 import { TEXTOS } from '../constants/textos'
 import { useLoteRecebiveis } from '../hooks/useLoteRecebiveis'
@@ -13,7 +14,7 @@ export function LoteRecebiveisDetalhe({ id }: LoteRecebiveisDetalheProps) {
   const { data: lote, isLoading, isError, error } = useLoteRecebiveis(id)
 
   if (isLoading) {
-    return <p>{TEXTOS.detalhe.carregando}</p>
+    return <p className="text-sm text-muted-foreground">{TEXTOS.detalhe.carregando}</p>
   }
 
   if (isError) {
@@ -25,44 +26,50 @@ export function LoteRecebiveisDetalhe({ id }: LoteRecebiveisDetalheProps) {
   }
 
   return (
-    <section aria-labelledby="titulo-detalhe-lote">
-      <p>
+    <section aria-labelledby="titulo-detalhe-lote" className="space-y-3">
+      <p className="flex items-center gap-2 text-sm text-muted-foreground">
         {TEXTOS.tabela.colunaDataReferencia}: {formatarData(lote.dataReferencia)} —{' '}
         <StatusBadge status={lote.status} />
       </p>
 
-      <h2 id="titulo-detalhe-lote">{TEXTOS.detalhe.tituloSecao}</h2>
+      <h2 id="titulo-detalhe-lote" className="text-lg font-semibold text-foreground">
+        {TEXTOS.detalhe.tituloSecao}
+      </h2>
 
-      <table>
-        <thead>
-          <tr>
-            <th scope="col">{TEXTOS.detalhe.colunaAtivo}</th>
-            <th scope="col">{TEXTOS.detalhe.colunaValorBruto}</th>
-            <th scope="col">{TEXTOS.detalhe.colunaMoedaPagamento}</th>
-            <th scope="col">{TEXTOS.detalhe.colunaValorPresente}</th>
-            <th scope="col">{TEXTOS.detalhe.colunaDesagio}</th>
-            <th scope="col">{TEXTOS.detalhe.colunaTaxa}</th>
-            <th scope="col">{TEXTOS.detalhe.colunaStatus}</th>
-            <th scope="col">{TEXTOS.detalhe.colunaMotivo}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {lote.recebiveis?.map((recebivel) => (
-            <tr key={recebivel.id}>
-              <td>{recebivel.ativo}</td>
-              <td>{formatarMoeda(recebivel.valorBruto, recebivel.moeda)}</td>
-              <td>{TEXTOS.moedas[recebivel.moedaPagamento ?? 'BRL']}</td>
-              <td>{formatarMoeda(recebivel.valorPresente, recebivel.moedaPagamento ?? recebivel.moeda)}</td>
-              <td>{formatarMoeda(recebivel.valorDesagio, recebivel.moeda)}</td>
-              <td>{formatarPercentual(recebivel.taxaDescontoAplicada)}</td>
-              <td>
-                <StatusBadge status={recebivel.status} />
-              </td>
-              <td>{recebivel.motivoRejeicao ?? '—'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="rounded-xl border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{TEXTOS.detalhe.colunaAtivo}</TableHead>
+              <TableHead>{TEXTOS.detalhe.colunaValorBruto}</TableHead>
+              <TableHead>{TEXTOS.detalhe.colunaMoedaPagamento}</TableHead>
+              <TableHead>{TEXTOS.detalhe.colunaValorPresente}</TableHead>
+              <TableHead>{TEXTOS.detalhe.colunaDesagio}</TableHead>
+              <TableHead>{TEXTOS.detalhe.colunaTaxa}</TableHead>
+              <TableHead>{TEXTOS.detalhe.colunaStatus}</TableHead>
+              <TableHead>{TEXTOS.detalhe.colunaMotivo}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {lote.recebiveis?.map((recebivel) => (
+              <TableRow key={recebivel.id}>
+                <TableCell>{recebivel.ativo}</TableCell>
+                <TableCell>{formatarMoeda(recebivel.valorBruto, recebivel.moeda)}</TableCell>
+                <TableCell>{TEXTOS.moedas[recebivel.moedaPagamento ?? 'BRL']}</TableCell>
+                <TableCell>
+                  {formatarMoeda(recebivel.valorPresente, recebivel.moedaPagamento ?? recebivel.moeda)}
+                </TableCell>
+                <TableCell>{formatarMoeda(recebivel.valorDesagio, recebivel.moeda)}</TableCell>
+                <TableCell>{formatarPercentual(recebivel.taxaDescontoAplicada)}</TableCell>
+                <TableCell>
+                  <StatusBadge status={recebivel.status} />
+                </TableCell>
+                <TableCell>{recebivel.motivoRejeicao ?? '—'}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
     </section>
   )
 }

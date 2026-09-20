@@ -1,5 +1,6 @@
 import { forwardRef, useId, type InputHTMLAttributes } from 'react'
-import styles from './TextField.module.css'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 interface TextFieldProps extends InputHTMLAttributes<HTMLInputElement> {
   label: string
@@ -7,7 +8,7 @@ interface TextFieldProps extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function TextField(
-  { label, error, id, ...props },
+  { label, error, id, className, ...props },
   ref,
 ) {
   const generatedId = useId()
@@ -15,20 +16,18 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function T
   const errorId = `${inputId}-error`
 
   return (
-    <div className={styles.field}>
-      <label htmlFor={inputId} className={styles.label}>
-        {label}
-      </label>
-      <input
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <Label htmlFor={inputId}>{label}</Label>
+      <Input
         ref={ref}
         id={inputId}
-        className={styles.input}
         aria-invalid={Boolean(error)}
         aria-describedby={error ? errorId : undefined}
+        className={className}
         {...props}
       />
       {error && (
-        <p id={errorId} role="alert" className={styles.error}>
+        <p id={errorId} role="alert" className="text-sm text-destructive">
           {error}
         </p>
       )}

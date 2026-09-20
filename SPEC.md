@@ -263,7 +263,7 @@ Construa uma Single Page Application seguindo boas práticas modernas:
 - **Roteamento**: rotas declaradas em um único lugar, com lazy loading por rota/feature e proteção de rotas quando houver autenticação.
 - **Tratamento de erros e estados**: todo fluxo de dados deve tratar explicitamente loading, vazio, erro e sucesso; error boundaries para falhas inesperadas; feedback ao usuário para ações (sucesso/erro).
 - **Formulários**: validação declarativa com schemas reutilizáveis, mensagens de erro claras e proteção contra submissão dupla.
-- **Design system mínimo**: componentes base reutilizáveis (botão, input, tabela, modal, etc.) em `shared/ui`, com tokens de tema centralizados. Evite estilos duplicados espalhados.
+- **Design system**: Tailwind CSS v4 + shadcn/ui (tema "Nova", cor base neutral/zinc, claro) — substituiu a abordagem inicial de CSS Modules por decisão do usuário, para um visual mais coeso. Primitivos shadcn (`Button`, `Input`, `Label`, `Select`, `Alert`, `Badge`, `Table`, `Card`) vivem em `src/components/ui/` (código gerado pelo CLI `shadcn`, não editado à mão, para facilitar atualizações futuras via `npx shadcn add`); componentes de `shared/ui` que precisam de lógica própria (ex.: `TextField` com label+erro, `Select` com `Controller` do react-hook-form para o Radix Select) compõem esses primitivos. Evite estilos duplicados espalhados — prefira classes utilitárias inline a CSS próprio.
 - **Acessibilidade**: HTML semântico, labels em campos, navegação por teclado e atributos ARIA onde necessário.
 - **Qualidade**: ESLint + Prettier configurados; testes unitários de componentes e hooks (foco em comportamento, não em implementação).
 - **Configuração**: URL da API e demais variáveis via ambiente em build/runtime, nunca hardcoded.

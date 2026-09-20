@@ -524,3 +524,36 @@ critério do usuário (ex.: revisão geral, ajustes de UX, deploy real).
     `moedaPagamento` (não mais na `moeda` do ativo) — esse era, na prática, um bug de exibição
     pré-existente da feature de câmbio (nunca tinha sido corrigido). `openapi.yaml`/`schema.d.ts`
     regenerados do backend real de novo.
+- **Migração do frontend de CSS Modules para Tailwind CSS v4 + shadcn/ui** (pedido do usuário,
+  "dar uma melhorada no visual"). Confirmado escopo (migração completa, não incremental) e tema
+  (neutral/zinc, claro) antes de começar. Pontos-chave:
+  - Instalado via CLI oficial (`npx shadcn@latest init --template vite --base radix --preset nova`)
+    rodando num container Node com o código-fonte copiado (sem `node_modules` do host, que tornaria
+    o `cp` pro filesystem nativo do container extremamente lento — mesma lição do workaround do
+    Vitest). Depois `npx shadcn@latest add input label select alert badge table card`.
+  - Primitivos gerados ficam em `src/components/ui/` (não editados à mão) — `Button`, `Input`,
+    `Label`, `Select` (Radix), `Alert`, `Badge`, `Table`, `Card`. Path alias `@/*` já existia no
+    `tsconfig.json` de uma etapa anterior; só faltava espelhar no `vite.config.ts` (`resolve.alias`)
+    e adicionar o plugin `@tailwindcss/vite`.
+  - `shared/ui/Button.tsx` removido (era só wrapper de 3 variantes; o `Button` do shadcn já cobre
+    isso nativamente). `shared/ui/TextField.tsx` e `Alert.tsx` viraram wrappers finos compondo os
+    primitivos, preservando a API pública (`label`/`error`, `variant`) para não precisar tocar nos
+    componentes de feature que os usam. `shared/ui/Select.tsx` mudou de API: o `<select>` nativo
+    (compatível com `register()` do react-hook-form) virou Radix Select, que não é um elemento de
+    formulário nativo — precisou de `Controller` (`control`/`name`/`options` como props, em vez de
+    spread de `register()`). Todos os `.module.css` removidos.
+  - `StatusBadge`, `LotesRecebiveisListagem` e `LoteRecebiveisDetalhe` migrados para `Badge`/`Table`
+    do shadcn. `LoteRecebiveisForm` usa `Card` para cada recebível do lote.
+  - Build quebrou duas vezes por causas triviais: faltava `@types/node` (o `vite.config.ts` passou
+    a importar `node:path`/`import.meta.dirname` para o alias, e o projeto nunca tinha precisado de
+    tipos do Node antes) e o `eslint.config.js` não tinha sido copiado para o container de teste
+    nativo (erro meu, não da migração em si).
+  - Validado com `npm test` (23/23, sem nenhum ajuste nos testes — a interação via Testing
+    Library com o Radix Select continuou funcionando), `npm run build` (tsc + vite, sem
+    erros de tipo) e verificação visual real: subiu o stack via `docker compose up -d --build
+    frontend`, screenshot via Edge headless nativo do Windows (`msedge.exe --headless=new
+    --screenshot=...` — `chromium-cli` não estava disponível neste ambiente) confirmando o layout
+    novo (Cards, Table, Badge verde/vermelho, Select com chevron) tanto na listagem quanto no
+    detalhe, incluindo o cenário cross-currency (valor presente em USD, deságio em BRL).
+  - `SPEC.md` ("Arquitetura Frontend e decisões" > "Design system") atualizado para refletir a
+    stack real.

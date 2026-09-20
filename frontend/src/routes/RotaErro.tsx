@@ -8,9 +8,9 @@ export function RotaErro() {
     : 'Ocorreu um erro inesperado.'
 
   return (
-    <main>
-      <h1>Algo deu errado</h1>
-      <p>{mensagem}</p>
+    <main className="mx-auto max-w-5xl space-y-2 px-4 py-8">
+      <h1 className="text-2xl font-semibold text-foreground">Algo deu errado</h1>
+      <p className="text-muted-foreground">{mensagem}</p>
     </main>
   )
 }
