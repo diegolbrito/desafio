@@ -31,11 +31,13 @@ body:json {
 docs {
   Demonstra cross-currency (ativo sempre em BRL, pagamento em outra moeda -
   ver SPEC.md, "Premissas adotadas" item 3): o desagio e' calculado
-  inteiramente em BRL (taxaBase/spread), usando a cotacao configurada no
-  backend (`credit-engine.cotacao-cambio` / env `COTACAO_CAMBIO` - NAO e'
-  passada por aqui, e' parametro de configuracao da aplicacao, igual
-  `custoOperacional`). Como o ativo e' sempre BRL, a unica direcao de
-  conversao possivel e' BRL -> moedaPagamento.
+  inteiramente em BRL (taxaBase/spread), usando a cotacao buscada pelo
+  backend num servico HTTP externo (mock local: `cotacao-cambio-mock`, ver
+  SPEC.md item 11) - NAO e' passada por aqui, e' resolvida internamente,
+  igual `custoOperacional`. Se o servico externo estiver fora do ar, o
+  backend cai para a ultima cotacao conhecida em cache ou para um valor de
+  fallback estatico - a precificacao nunca falha por isso. Como o ativo e'
+  sempre BRL, a unica direcao de conversao possivel e' BRL -> moedaPagamento.
 
   Na resposta, so' o `valorPresente` vem convertido para `moedaPagamento` (e'
   o valor que de fato sera pago); `valorDesagio` continua sempre em BRL,

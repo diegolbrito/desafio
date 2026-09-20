@@ -47,4 +47,13 @@ public class CreditEngineMetrics {
         registry.summary("creditengine.valor.liquidado", "moeda", moedaPagamento.name())
                 .record(valorPresente.doubleValue());
     }
+
+    /**
+     * @param origem "externa" (servico de cambio respondeu), "cache" (ultimo valor bom
+     *               conhecido, servico fora) ou "fallback_estatico" (nunca teve valor bom,
+     *               cold start com servico fora) - ver CotacaoCambioHttpAdapter.
+     */
+    public void registrarCotacaoOrigem(String origem) {
+        registry.counter("creditengine.cotacao.consultas", "origem", origem).increment();
+    }
 }

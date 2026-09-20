@@ -6,7 +6,7 @@
   "tags": ["credit-engine"],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 3,
+  "version": 4,
   "refresh": "10s",
   "time": { "from": "now-1h", "to": "now" },
   "templating": { "list": [] },
@@ -114,16 +114,33 @@
       ]
     },
     {
+      "id": 14,
+      "type": "timeseries",
+      "title": "Consultas de cotacao cambial (por origem)",
+      "description": "externa = servico respondeu; cache = ultimo valor bom conhecido (servico fora); fallback_estatico = nunca teve valor bom (cold start com servico fora). Ver SPEC.md item 11.",
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 17 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "expr": "sum by (origem) (rate(creditengine_cotacao_consultas_total[5m]))",
+          "legendFormat": "{{origem}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
       "id": 8,
       "type": "row",
       "title": "HTTP",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 }
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 }
     },
     {
       "id": 9,
       "type": "timeseries",
       "title": "Taxa de requisicoes HTTP (por rota)",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 18 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
       "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
@@ -139,7 +156,7 @@
       "id": 10,
       "type": "timeseries",
       "title": "Latencia HTTP p50, p90 e p95 (por rota)",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 18 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": { "defaults": { "unit": "s", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
       "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
@@ -165,13 +182,13 @@
       "id": 11,
       "type": "row",
       "title": "Infraestrutura (JVM / banco)",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 26 }
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 32 }
     },
     {
       "id": 12,
       "type": "timeseries",
       "title": "Memoria heap JVM (usada)",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 27 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 33 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
       "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
@@ -187,7 +204,7 @@
       "id": 13,
       "type": "timeseries",
       "title": "Pool de conexoes (HikariCP)",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 27 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 33 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
       "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },

@@ -4,6 +4,7 @@ import com.srmasset.creditengine.application.exception.ReferenciaNaoEncontradaEx
 import com.srmasset.creditengine.application.metrics.CreditEngineMetrics;
 import com.srmasset.creditengine.application.port.in.ComandoPrecificarLote;
 import com.srmasset.creditengine.application.port.out.CategoriaRiscoRepositoryPort;
+import com.srmasset.creditengine.application.port.out.CotacaoCambioPort;
 import com.srmasset.creditengine.application.port.out.RegistrarEventoTransacaoPort;
 import com.srmasset.creditengine.application.port.out.SalvarLoteRecebiveisPort;
 import com.srmasset.creditengine.application.port.out.TaxaBaseRepositoryPort;
@@ -29,6 +30,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -46,6 +48,8 @@ class PrecificarLoteServiceTest {
     private SalvarLoteRecebiveisPort salvarLotePort;
     @Mock
     private RegistrarEventoTransacaoPort registrarEventoPort;
+    @Mock
+    private CotacaoCambioPort cotacaoCambioPort;
 
     private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
 
@@ -54,7 +58,7 @@ class PrecificarLoteServiceTest {
     @BeforeEach
     void setUp() {
         service = new PrecificarLoteService(taxaBaseRepository, categoriaRiscoRepository,
-                salvarLotePort, registrarEventoPort, new BigDecimal("0.005"), new BigDecimal("5.20"), RELOGIO_FIXO,
+                salvarLotePort, registrarEventoPort, cotacaoCambioPort, new BigDecimal("0.005"), RELOGIO_FIXO,
                 new CreditEngineMetrics(meterRegistry));
 
         when(salvarLotePort.salvar(any())).thenAnswer(invocation -> {
@@ -90,6 +94,8 @@ class PrecificarLoteServiceTest {
         assertThat(meterRegistry.counter("creditengine.recebiveis.processados", "status", "PRECIFICADO").count())
                 .isEqualTo(2.0);
         assertThat(meterRegistry.summary("creditengine.valor.precificado", "moeda", "BRL").count()).isEqualTo(2);
+        // lote 100% BRL nao precisa de cambio - nao deve gerar nenhuma chamada ao servico externo
+        verify(cotacaoCambioPort, never()).buscarCotacao();
     }
 
     @Test
@@ -134,8 +140,9 @@ class PrecificarLoteServiceTest {
     void precificaCrossCurrencyConvertendoValoresParaAMoedaDePagamento() {
         when(taxaBaseRepository.buscarTaxaVigente(Moeda.BRL)).thenReturn(new BigDecimal("0.05"));
         when(categoriaRiscoRepository.buscarSpread(CategoriaRisco.B)).thenReturn(new BigDecimal("0.03"));
+        when(cotacaoCambioPort.buscarCotacao()).thenReturn(new BigDecimal("5.00"));
         service = new PrecificarLoteService(taxaBaseRepository, categoriaRiscoRepository,
-                salvarLotePort, registrarEventoPort, new BigDecimal("0.02"), new BigDecimal("5.00"), RELOGIO_FIXO,
+                salvarLotePort, registrarEventoPort, cotacaoCambioPort, new BigDecimal("0.02"), RELOGIO_FIXO,
                 new CreditEngineMetrics(meterRegistry));
 
         ComandoPrecificarLote comando = new ComandoPrecificarLote(List.of(
@@ -154,5 +161,30 @@ class PrecificarLoteServiceTest {
         assertThat(recebivel.getValorDesagio()).isEqualByComparingTo("1000.00");
         assertThat(recebivel.getMoedaPagamento()).isEqualTo(Moeda.USD);
         assertThat(recebivel.getCotacaoCambio()).isEqualByComparingTo("5.00");
+        // buscado 1x so' (nao por item) - unico item do lote e' cross-currency
+        verify(cotacaoCambioPort, times(1)).buscarCotacao();
+    }
+
+    @Test
+    void buscaCotacaoUmaUnicaVezParaVariosItensCrossCurrencyDoMesmoLote() {
+        when(taxaBaseRepository.buscarTaxaVigente(Moeda.BRL)).thenReturn(new BigDecimal("0.05"));
+        when(categoriaRiscoRepository.buscarSpread(CategoriaRisco.B)).thenReturn(new BigDecimal("0.03"));
+        when(cotacaoCambioPort.buscarCotacao()).thenReturn(new BigDecimal("5.00"));
+        service = new PrecificarLoteService(taxaBaseRepository, categoriaRiscoRepository,
+                salvarLotePort, registrarEventoPort, cotacaoCambioPort, new BigDecimal("0.02"), RELOGIO_FIXO,
+                new CreditEngineMetrics(meterRegistry));
+
+        ComandoPrecificarLote comando = new ComandoPrecificarLote(List.of(
+                new ComandoPrecificarLote.ComandoRecebivel("Ativo A", new BigDecimal("11000.00"),
+                        LocalDate.of(2026, 10, 18), CategoriaRisco.B, Moeda.USD),
+                new ComandoPrecificarLote.ComandoRecebivel("Ativo B", new BigDecimal("5500.00"),
+                        LocalDate.of(2026, 11, 18), CategoriaRisco.B, Moeda.USD)
+        ));
+
+        LoteRecebiveis lote = service.precificar(comando);
+
+        assertThat(lote.getRecebiveis()).allMatch(r -> r.getStatus() == StatusRecebivel.PRECIFICADO);
+        assertThat(lote.getRecebiveis()).allMatch(r -> r.getCotacaoCambio().compareTo(new BigDecimal("5.00")) == 0);
+        verify(cotacaoCambioPort, times(1)).buscarCotacao();
     }
 }

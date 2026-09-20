@@ -1,0 +1,17 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPath": "/api/v1/cotacoes/USD-BRL"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "parMoedas": "USD-BRL",
+      "cotacao": "5.4321",
+      "atualizadoEm": "2026-09-20T12:00:00Z"
+    }
+  }
+}
