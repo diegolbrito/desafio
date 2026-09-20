@@ -20,25 +20,42 @@ public class Recebivel {
     private final Moeda moeda;
     private final LocalDate dataVencimento;
     private final CategoriaRisco categoriaRisco;
+    private final Moeda moedaPagamento;
 
     private StatusRecebivel status;
     private BigDecimal valorPresente;
     private BigDecimal valorDesagio;
     private BigDecimal taxaDescontoAplicada;
+    private BigDecimal cotacaoCambio;
     private String motivoRejeicao;
 
-    private Recebivel(String cedente, BigDecimal valorBruto, Moeda moeda,
-                       LocalDate dataVencimento, CategoriaRisco categoriaRisco) {
+    private Recebivel(String cedente, BigDecimal valorBruto, Moeda moeda, LocalDate dataVencimento,
+                       CategoriaRisco categoriaRisco, Moeda moedaPagamento) {
         this.cedente = cedente;
         this.valorBruto = valorBruto;
         this.moeda = moeda;
         this.dataVencimento = dataVencimento;
         this.categoriaRisco = categoriaRisco;
+        this.moedaPagamento = moedaPagamento;
         this.status = StatusRecebivel.PENDENTE;
     }
 
     public static Recebivel criar(String cedente, BigDecimal valorBruto, Moeda moeda,
                                    LocalDate dataVencimento, CategoriaRisco categoriaRisco) {
+        return criar(cedente, valorBruto, moeda, dataVencimento, categoriaRisco, moeda);
+    }
+
+    /**
+     * @param moedaPagamento moeda em que o recebivel e' efetivamente pago; se {@code null},
+     *                       assume a propria {@code moeda} do titulo (sem cross-currency). A
+     *                       cotacao de cambio usada na conversao (quando as moedas diferem) nao
+     *                       e' informada aqui - vem de configuracao da aplicacao (mesmo padrao
+     *                       de custoOperacional, ver SPEC.md "Premissas adotadas" item 3) e e'
+     *                       aplicada/snapshotada em {@link #aplicarPrecificacao}.
+     */
+    public static Recebivel criar(String cedente, BigDecimal valorBruto, Moeda moeda,
+                                   LocalDate dataVencimento, CategoriaRisco categoriaRisco,
+                                   Moeda moedaPagamento) {
         if (cedente == null || cedente.isBlank()) {
             throw new RecebivelInvalidoException("Cedente e obrigatorio");
         }
@@ -54,7 +71,8 @@ public class Recebivel {
         if (categoriaRisco == null) {
             throw new RecebivelInvalidoException("Categoria de risco e obrigatoria");
         }
-        return new Recebivel(cedente, valorBruto, moeda, dataVencimento, categoriaRisco);
+        Moeda moedaPagamentoResolvida = moedaPagamento == null ? moeda : moedaPagamento;
+        return new Recebivel(cedente, valorBruto, moeda, dataVencimento, categoriaRisco, moedaPagamentoResolvida);
     }
 
     /**
@@ -78,10 +96,21 @@ public class Recebivel {
     }
 
     public void aplicarPrecificacao(ResultadoDesagio resultado) {
+        aplicarPrecificacao(resultado, null);
+    }
+
+    /**
+     * @param cotacaoCambioAplicada cotacao de cambio efetivamente usada para converter o
+     *                              resultado para moedaPagamento (snapshot de auditoria - ver
+     *                              SPEC.md "Premissas adotadas" item 3); {@code null} quando
+     *                              moedaPagamento == moeda (sem conversao).
+     */
+    public void aplicarPrecificacao(ResultadoDesagio resultado, BigDecimal cotacaoCambioAplicada) {
         exigirStatus(StatusRecebivel.PENDENTE);
         this.valorPresente = resultado.valorPresente();
         this.valorDesagio = resultado.valorDesagio();
         this.taxaDescontoAplicada = resultado.taxaDescontoAplicada();
+        this.cotacaoCambio = cotacaoCambioAplicada;
         this.status = StatusRecebivel.PRECIFICADO;
     }
 
@@ -124,6 +153,14 @@ public class Recebivel {
 
     public CategoriaRisco getCategoriaRisco() {
         return categoriaRisco;
+    }
+
+    public Moeda getMoedaPagamento() {
+        return moedaPagamento;
+    }
+
+    public BigDecimal getCotacaoCambio() {
+        return cotacaoCambio;
     }
 
     public StatusRecebivel getStatus() {

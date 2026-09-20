@@ -403,3 +403,39 @@ critério do usuário (ex.: revisão geral, ajustes de UX, deploy real).
   - Testes (`CalculadoraDesagioTest`, `RecebivelTest`, `PersistenciaIntegrationTest`) atualizados
     para a nova assinatura/valores; `PrecificarLoteServiceTest` não precisou de mudança de
     asserção (usa taxas mockadas diretamente, não depende de base de dias).
+- **Câmbio cross-currency (título numa moeda, pagamento em outra)** adicionado a pedido do usuário,
+  revertendo a premissa anterior de que câmbio "não é necessário" (SPEC.md item 3). Pontos-chave:
+  - `Recebivel` ganha `moedaPagamento` (novo overload de `criar` com 6 args; o de 5 delega para
+    ele com `moedaPagamento=moeda`, sem quebrar os call sites existentes) e um campo mutável
+    `cotacaoCambio`, preenchido só no momento da precificação (`aplicarPrecificacao`), não na
+    criação — é resultado do processamento, não dado de entrada do cliente.
+  - Nova classe de domínio `ConversorCambial`: converte `ResultadoDesagio` **ao final** do cálculo
+    de deságio (que continua 100% na moeda do título). Convenção assumida: `cotacaoCambio` é
+    sempre "BRL por 1 USD", independente de qual moeda é o título — simplificação só válida com
+    duas moedas. O deságio convertido é derivado por subtração após arredondamento (mesma técnica
+    do item 1), preservando o invariante `valorPresente + deságio == valorBruto` em termos da
+    moeda de pagamento; `valorBruto` em si não é convertido/persistido (fica só na moeda do
+    título, valor de face contratual).
+  - **Decisão revisada em seguida pelo usuário**: a cotação inicialmente foi recebida por
+    parâmetro na API, por recebível (`RecebivelRequest.cotacaoCambio`) — o usuário pediu para
+    mudar para o mesmo padrão de `custoOperacional`: parâmetro de configuração da aplicação
+    (`credit-engine.cotacao-cambio`, env var `COTACAO_CAMBIO`), não mais um campo do request.
+    Motivo: assim como o custo operacional, é um valor único de sistema (só existem duas moedas,
+    logo um único par a converter), não um dado por recebível que o cliente da API deveria
+    informar. Isso simplificou a validação (não há mais regra cruzada de "cotação obrigatória
+    quando moedas diferem" no `Recebivel.criar` — a cotação sempre existe, vem da configuração) e
+    moveu a responsabilidade de fornecê-la para o `PrecificarLoteService` (novo parâmetro de
+    construtor `cotacaoCambioPadrao`, injetado via `UseCaseConfig` com `@Value`), na mesma linha
+    de `custoOperacionalPadrao`.
+  - Persistência: nova migration (`V202609181006__adicionar_cambio_recebivel.sql`) adiciona
+    `moeda_pagamento` (not null, backfill = `moeda` para linhas existentes) e `cotacao_cambio`
+    (nullable) na tabela `recebivel`, com `CHECK` garantindo consistência (`cotacao_cambio` só
+    não-nulo quando `moeda_pagamento <> moeda`) — continua útil mesmo com a cotação vindo de
+    configuração: é o snapshot de auditoria de qual valor estava vigente quando aquele recebível
+    foi precificado (o parâmetro de aplicação pode mudar entre um deploy e outro).
+  - Fios propagados em toda a cadeia: `RecebivelRequest` (só `moedaPagamento`)/`RecebivelResponse`
+    (moedaPagamento + cotacaoCambio, ambos ainda expostos na leitura), `ComandoPrecificarLote.
+    ComandoRecebivel`, `RecebivelEntity`, `RecebivelLeitura`. Testes: `ConversorCambialTest`,
+    cenário cross-currency em `PrecificarLoteServiceTest` (agora configurando
+    `cotacaoCambioPadrao` no construtor do service em vez de no comando) e round-trip de
+    persistência em `PersistenciaIntegrationTest`.

@@ -21,6 +21,12 @@ import java.time.LocalDate;
  * serializa dinheiro/taxas como string (ver JacksonConfig e SPEC.md, "Tipos de
  * dados canonicos") - sem a anotacao, o schema OpenAPI ficaria errado e a geracao
  * de tipos do frontend (Etapa 6) produziria "number" em vez de "string".
+ *
+ * <p>{@code moedaPagamento} e' opcional: quando omitido (ou igual a {@code moeda}), nao ha
+ * conversao cambial. Quando difere de {@code moeda} (cross-currency), a cotacao usada na
+ * conversao NAO e' recebida aqui - vem de configuracao da aplicacao
+ * ({@code credit-engine.cotacao-cambio}), mesmo padrao de {@code custoOperacional} (ver
+ * SPEC.md, "Premissas adotadas" item 3).
  */
 public record RecebivelRequest(
         @NotBlank(message = "Cedente e obrigatorio") String cedente,
@@ -28,5 +34,8 @@ public record RecebivelRequest(
         @Schema(type = "string", example = "15000.00") BigDecimal valorBruto,
         @NotNull(message = "Moeda e obrigatoria") Moeda moeda,
         @NotNull(message = "Data de vencimento e obrigatoria") LocalDate dataVencimento,
-        @NotNull(message = "Categoria de risco e obrigatoria") CategoriaRisco categoriaRisco) {
+        @NotNull(message = "Categoria de risco e obrigatoria") CategoriaRisco categoriaRisco,
+        @Schema(description = "Moeda em que o recebivel e' efetivamente pago, se diferente de `moeda` "
+                + "(cross-currency). Omitir quando o pagamento e' na propria moeda do titulo.")
+        Moeda moedaPagamento) {
 }

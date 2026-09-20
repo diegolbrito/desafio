@@ -40,9 +40,10 @@ public class UseCaseConfig {
             SalvarLoteRecebiveisPort salvarLotePort,
             RegistrarEventoTransacaoPort registrarEventoPort,
             @Value("${credit-engine.custo-operacional}") BigDecimal custoOperacionalPadrao,
+            @Value("${credit-engine.cotacao-cambio}") BigDecimal cotacaoCambioPadrao,
             Clock clock) {
         return new PrecificarLoteService(taxaBaseRepository, categoriaRiscoRepository,
-                salvarLotePort, registrarEventoPort, custoOperacionalPadrao, clock);
+                salvarLotePort, registrarEventoPort, custoOperacionalPadrao, cotacaoCambioPadrao, clock);
     }
 
     @Bean

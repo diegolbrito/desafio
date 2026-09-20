@@ -49,6 +49,7 @@ public class LoteRecebiveisPersistenceAdapter implements SalvarLoteRecebiveisPor
                 recebivel.getCedente(), recebivel.getValorBruto(), recebivel.getMoeda(),
                 recebivel.getDataVencimento(), recebivel.getCategoriaRisco(), recebivel.getStatus(),
                 recebivel.getValorPresente(), recebivel.getValorDesagio(),
-                recebivel.getTaxaDescontoAplicada(), recebivel.getMotivoRejeicao());
+                recebivel.getTaxaDescontoAplicada(), recebivel.getMotivoRejeicao(),
+                recebivel.getMoedaPagamento(), recebivel.getCotacaoCambio());
     }
 }

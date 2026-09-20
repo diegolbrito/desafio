@@ -26,6 +26,24 @@ class RecebivelTest {
     }
 
     @Test
+    void semMoedaPagamentoInformadaAssumeAPropriaMoedaSemCotacao() {
+        Recebivel recebivel = recebivelValido();
+
+        assertThat(recebivel.getMoedaPagamento()).isEqualTo(Moeda.BRL);
+        assertThat(recebivel.getCotacaoCambio()).isNull();
+    }
+
+    @Test
+    void aceitaMoedaPagamentoDiferenteDaMoedaDoTitulo() {
+        Recebivel recebivel = Recebivel.criar("Cedente", new BigDecimal("1000.00"), Moeda.BRL,
+                LocalDate.of(2026, 12, 31), CategoriaRisco.B, Moeda.USD);
+
+        assertThat(recebivel.getMoedaPagamento()).isEqualTo(Moeda.USD);
+        // cotacaoCambio so e' preenchida na precificacao (vem de configuracao, nao da criacao)
+        assertThat(recebivel.getCotacaoCambio()).isNull();
+    }
+
+    @Test
     void rejeitaValorBrutoNaoPositivo() {
         assertThatThrownBy(() -> Recebivel.criar("Cedente", new BigDecimal("0.00"), Moeda.BRL,
                 LocalDate.of(2026, 12, 31), CategoriaRisco.A))
@@ -83,6 +101,19 @@ class RecebivelTest {
         assertThat(recebivel.getValorPresente()).isEqualByComparingTo("950.00");
         assertThat(recebivel.getValorDesagio()).isEqualByComparingTo("50.00");
         assertThat(recebivel.getTaxaDescontoAplicada()).isEqualByComparingTo("0.105000");
+        assertThat(recebivel.getCotacaoCambio()).isNull();
+    }
+
+    @Test
+    void aplicarPrecificacaoComCotacaoSnapshotaACotacaoAplicada() {
+        Recebivel recebivel = Recebivel.criar("Cedente", new BigDecimal("1000.00"), Moeda.BRL,
+                LocalDate.of(2026, 12, 31), CategoriaRisco.B, Moeda.USD);
+        ResultadoDesagio resultado = new ResultadoDesagio(
+                new BigDecimal("190.00"), new BigDecimal("10.00"), new BigDecimal("0.105000"));
+
+        recebivel.aplicarPrecificacao(resultado, new BigDecimal("5.20"));
+
+        assertThat(recebivel.getCotacaoCambio()).isEqualByComparingTo("5.20");
     }
 
     @Test

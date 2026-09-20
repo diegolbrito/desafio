@@ -8,6 +8,7 @@ import com.srmasset.creditengine.application.port.out.RegistrarEventoTransacaoPo
 import com.srmasset.creditengine.application.port.out.SalvarLoteRecebiveisPort;
 import com.srmasset.creditengine.application.port.out.TaxaBaseRepositoryPort;
 import com.srmasset.creditengine.domain.CalculadoraDesagio;
+import com.srmasset.creditengine.domain.ConversorCambial;
 import com.srmasset.creditengine.domain.EventoTransacao;
 import com.srmasset.creditengine.domain.LoteRecebiveis;
 import com.srmasset.creditengine.domain.Recebivel;
@@ -35,12 +36,14 @@ public class PrecificarLoteService implements PrecificarLoteUseCase {
     private static final Logger log = LoggerFactory.getLogger(PrecificarLoteService.class);
 
     private final CalculadoraDesagio calculadora = new CalculadoraDesagio();
+    private final ConversorCambial conversorCambial = new ConversorCambial();
 
     private final TaxaBaseRepositoryPort taxaBaseRepository;
     private final CategoriaRiscoRepositoryPort categoriaRiscoRepository;
     private final SalvarLoteRecebiveisPort salvarLotePort;
     private final RegistrarEventoTransacaoPort registrarEventoPort;
     private final BigDecimal custoOperacionalPadrao;
+    private final BigDecimal cotacaoCambioPadrao;
     private final Clock clock;
 
     public PrecificarLoteService(TaxaBaseRepositoryPort taxaBaseRepository,
@@ -48,12 +51,14 @@ public class PrecificarLoteService implements PrecificarLoteUseCase {
                                   SalvarLoteRecebiveisPort salvarLotePort,
                                   RegistrarEventoTransacaoPort registrarEventoPort,
                                   BigDecimal custoOperacionalPadrao,
+                                  BigDecimal cotacaoCambioPadrao,
                                   Clock clock) {
         this.taxaBaseRepository = taxaBaseRepository;
         this.categoriaRiscoRepository = categoriaRiscoRepository;
         this.salvarLotePort = salvarLotePort;
         this.registrarEventoPort = registrarEventoPort;
         this.custoOperacionalPadrao = custoOperacionalPadrao;
+        this.cotacaoCambioPadrao = cotacaoCambioPadrao;
         this.clock = clock;
     }
 
@@ -64,7 +69,8 @@ public class PrecificarLoteService implements PrecificarLoteUseCase {
         LocalDate dataReferencia = LocalDate.now(clock);
 
         List<Recebivel> recebiveis = comando.recebiveis().stream()
-                .map(r -> Recebivel.criar(r.cedente(), r.valorBruto(), r.moeda(), r.dataVencimento(), r.categoriaRisco()))
+                .map(r -> Recebivel.criar(r.cedente(), r.valorBruto(), r.moeda(), r.dataVencimento(), r.categoriaRisco(),
+                        r.moedaPagamento()))
                 .toList();
 
         LoteRecebiveis lote = LoteRecebiveis.criar(dataReferencia, recebiveis);
@@ -97,7 +103,10 @@ public class PrecificarLoteService implements PrecificarLoteUseCase {
             ResultadoDesagio resultado = calculadora.calcular(
                     recebivel.getValorBruto(), prazoMeses,
                     taxaBase, spreadRisco, custoOperacionalPadrao);
-            recebivel.aplicarPrecificacao(resultado);
+            boolean crossCurrency = recebivel.getMoedaPagamento() != recebivel.getMoeda();
+            resultado = conversorCambial.converter(resultado, recebivel.getValorBruto(),
+                    recebivel.getMoeda(), recebivel.getMoedaPagamento(), cotacaoCambioPadrao);
+            recebivel.aplicarPrecificacao(resultado, crossCurrency ? cotacaoCambioPadrao : null);
         } catch (PrazoInvalidoException e) {
             recebivel.rejeitar(e.getMessage());
             log.debug("Recebivel rejeitado por prazo invalido: motivo={}", e.getMessage());

@@ -103,6 +103,6 @@ public class LoteRecebiveisController {
 
     private ComandoPrecificarLote.ComandoRecebivel paraComandoRecebivel(RecebivelRequest request) {
         return new ComandoPrecificarLote.ComandoRecebivel(request.cedente(), request.valorBruto(),
-                request.moeda(), request.dataVencimento(), request.categoriaRisco());
+                request.moeda(), request.dataVencimento(), request.categoriaRisco(), request.moedaPagamento());
     }
 }
