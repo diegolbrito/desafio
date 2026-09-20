@@ -19,6 +19,32 @@ server:
   # Location de um 201 fica com a porta interna do container, nao a publica.
   forward-headers-strategy: framework
 
+management:
+  endpoints:
+    web:
+      exposure:
+        # So' os 3 necessarios para observabilidade (Prometheus + health check),
+        # nao o "*" padrao do actuator - endpoints como /env ou /beans vazam
+        # detalhe interno (config, grafo de beans) sem necessidade (ver SPEC.md,
+        # "Premissas adotadas" - observabilidade).
+        include: health,prometheus,info
+  endpoint:
+    health:
+      # Sem autenticacao nas APIs (SPEC.md, "Seguranca") - coerente expor o
+      # detalhe do health check tambem (db up/down), util em desenvolvimento.
+      show-details: always
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  metrics:
+    distribution:
+      # Sem isso, http.server.requests vira so' contador+soma (sem _bucket) -
+      # nao da' pra calcular percentil (p95/p99) no Prometheus via
+      # histogram_quantile, que e' o jeito padrao de medir latencia de API.
+      percentiles-histogram:
+        http.server.requests: true
+
 credit-engine:
   # Spread fixo de custo operacional (fracao decimal, a.m.) somado a taxa base +
   # spread de risco na formula de desagio (ver SPEC.md, "Premissas adotadas" item 4).

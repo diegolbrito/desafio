@@ -1,6 +1,7 @@
 package com.srmasset.creditengine.application.service;
 
 import com.srmasset.creditengine.application.exception.ReferenciaNaoEncontradaException;
+import com.srmasset.creditengine.application.metrics.CreditEngineMetrics;
 import com.srmasset.creditengine.application.port.in.ComandoPrecificarLote;
 import com.srmasset.creditengine.application.port.out.CategoriaRiscoRepositoryPort;
 import com.srmasset.creditengine.application.port.out.RegistrarEventoTransacaoPort;
@@ -11,6 +12,7 @@ import com.srmasset.creditengine.domain.LoteRecebiveis;
 import com.srmasset.creditengine.domain.Moeda;
 import com.srmasset.creditengine.domain.StatusLote;
 import com.srmasset.creditengine.domain.StatusRecebivel;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -45,12 +47,15 @@ class PrecificarLoteServiceTest {
     @Mock
     private RegistrarEventoTransacaoPort registrarEventoPort;
 
+    private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+
     private PrecificarLoteService service;
 
     @BeforeEach
     void setUp() {
         service = new PrecificarLoteService(taxaBaseRepository, categoriaRiscoRepository,
-                salvarLotePort, registrarEventoPort, new BigDecimal("0.005"), new BigDecimal("5.20"), RELOGIO_FIXO);
+                salvarLotePort, registrarEventoPort, new BigDecimal("0.005"), new BigDecimal("5.20"), RELOGIO_FIXO,
+                new CreditEngineMetrics(meterRegistry));
 
         when(salvarLotePort.salvar(any())).thenAnswer(invocation -> {
             LoteRecebiveis lote = invocation.getArgument(0);
@@ -79,6 +84,12 @@ class PrecificarLoteServiceTest {
         verify(salvarLotePort).salvar(any());
         // 1 lote_recebido + 2 recebiveis precificados + 1 lote_precificado
         verify(registrarEventoPort, times(4)).registrar(any());
+
+        assertThat(meterRegistry.counter("creditengine.lotes.precificados", "status", "PRECIFICADO").count())
+                .isEqualTo(1.0);
+        assertThat(meterRegistry.counter("creditengine.recebiveis.processados", "status", "PRECIFICADO").count())
+                .isEqualTo(2.0);
+        assertThat(meterRegistry.summary("creditengine.valor.precificado", "moeda", "BRL").count()).isEqualTo(2);
     }
 
     @Test
@@ -124,7 +135,8 @@ class PrecificarLoteServiceTest {
         when(taxaBaseRepository.buscarTaxaVigente(Moeda.BRL)).thenReturn(new BigDecimal("0.05"));
         when(categoriaRiscoRepository.buscarSpread(CategoriaRisco.B)).thenReturn(new BigDecimal("0.03"));
         service = new PrecificarLoteService(taxaBaseRepository, categoriaRiscoRepository,
-                salvarLotePort, registrarEventoPort, new BigDecimal("0.02"), new BigDecimal("5.00"), RELOGIO_FIXO);
+                salvarLotePort, registrarEventoPort, new BigDecimal("0.02"), new BigDecimal("5.00"), RELOGIO_FIXO,
+                new CreditEngineMetrics(meterRegistry));
 
         ComandoPrecificarLote comando = new ComandoPrecificarLote(List.of(
                 new ComandoPrecificarLote.ComandoRecebivel("Ativo A", new BigDecimal("11000.00"),

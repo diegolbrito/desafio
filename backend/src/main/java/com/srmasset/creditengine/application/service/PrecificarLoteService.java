@@ -1,6 +1,7 @@
 package com.srmasset.creditengine.application.service;
 
 import com.srmasset.creditengine.application.exception.ReferenciaNaoEncontradaException;
+import com.srmasset.creditengine.application.metrics.CreditEngineMetrics;
 import com.srmasset.creditengine.application.port.in.ComandoPrecificarLote;
 import com.srmasset.creditengine.application.port.in.PrecificarLoteUseCase;
 import com.srmasset.creditengine.application.port.out.CategoriaRiscoRepositoryPort;
@@ -45,6 +46,7 @@ public class PrecificarLoteService implements PrecificarLoteUseCase {
     private final BigDecimal custoOperacionalPadrao;
     private final BigDecimal cotacaoCambioPadrao;
     private final Clock clock;
+    private final CreditEngineMetrics metrics;
 
     public PrecificarLoteService(TaxaBaseRepositoryPort taxaBaseRepository,
                                   CategoriaRiscoRepositoryPort categoriaRiscoRepository,
@@ -52,7 +54,8 @@ public class PrecificarLoteService implements PrecificarLoteUseCase {
                                   RegistrarEventoTransacaoPort registrarEventoPort,
                                   BigDecimal custoOperacionalPadrao,
                                   BigDecimal cotacaoCambioPadrao,
-                                  Clock clock) {
+                                  Clock clock,
+                                  CreditEngineMetrics metrics) {
         this.taxaBaseRepository = taxaBaseRepository;
         this.categoriaRiscoRepository = categoriaRiscoRepository;
         this.salvarLotePort = salvarLotePort;
@@ -60,6 +63,7 @@ public class PrecificarLoteService implements PrecificarLoteUseCase {
         this.custoOperacionalPadrao = custoOperacionalPadrao;
         this.cotacaoCambioPadrao = cotacaoCambioPadrao;
         this.clock = clock;
+        this.metrics = metrics;
     }
 
     @Override
@@ -89,6 +93,7 @@ public class PrecificarLoteService implements PrecificarLoteUseCase {
 
         LoteRecebiveis loteSalvo = salvarLotePort.salvar(lote);
         registrarEventos(loteSalvo, motivoErro);
+        registrarMetricas(loteSalvo);
 
         log.info("Lote {} precificado: status={}, {} recebivel(is)",
                 loteSalvo.getId(), loteSalvo.getStatus(), loteSalvo.getRecebiveis().size());
@@ -129,5 +134,17 @@ public class PrecificarLoteService implements PrecificarLoteUseCase {
                 ? EventoTransacao.lotePrecificado(lote.getId(), agora)
                 : EventoTransacao.loteComErro(lote.getId(), motivoErro, agora);
         registrarEventoPort.registrar(eventoFinal);
+    }
+
+    private void registrarMetricas(LoteRecebiveis lote) {
+        metrics.registrarLotePrecificado(lote.getStatus());
+        for (Recebivel recebivel : lote.getRecebiveis()) {
+            if (recebivel.getStatus() == StatusRecebivel.PRECIFICADO) {
+                metrics.registrarRecebivelProcessado(StatusRecebivel.PRECIFICADO);
+                metrics.registrarValorPrecificado(recebivel.getValorPresente(), recebivel.getMoedaPagamento());
+            } else if (recebivel.getStatus() == StatusRecebivel.REJEITADO) {
+                metrics.registrarRecebivelProcessado(StatusRecebivel.REJEITADO);
+            }
+        }
     }
 }

@@ -5,12 +5,13 @@ Decisões de negócio/arquitetura ficam registradas em `SPEC.md` (seção "Premi
 ficam apenas decisões técnicas pontuais tomadas durante a construção.
 
 ## Status geral
-**Todas as 8 etapas do plano original concluídas**, mais a feature de liquidação (pós-MVP, ver
-final da seção "Concluído" e SPEC.md item 9). Backend (hexagonal, Spring Boot 4.1/Java 25) e
-frontend (React 19.3/TS) implementados, testados e validados end-to-end via `docker-compose`
-completo (db + backend + frontend). A feature de liquidação está implementada e testada
-(60/60 backend, ver detalhe abaixo) mas **ainda não commitada/enviada ao repositório** — aguardando
-revisão/teste do usuário antes de qualquer commit/push, por pedido explícito dele.
+**Todas as 8 etapas do plano original concluídas**, mais as features pós-MVP de liquidação (SPEC.md
+item 9, release v0.3.0) e observabilidade/métricas (SPEC.md item 10, ver final da seção
+"Concluído"). Backend (hexagonal, Spring Boot 4.1/Java 25) e frontend (React 19.3/TS)
+implementados, testados e validados end-to-end via `docker-compose` completo (db + backend +
+frontend + prometheus + grafana). A feature de métricas está implementada e testada (64/64 backend)
+mas **ainda não commitada/enviada ao repositório** — aguardando aprovação do usuário antes do
+commit/PR/release, mesmo fluxo já usado nas features anteriores.
 
 ## Concluído
 - [x] SPEC.md revisado; seção "Premissas adotadas" preenchida (fórmula de deságio, categorias de
@@ -616,6 +617,59 @@ revisão/teste do usuário antes de qualquer commit/push, por pedido explícito 
     `PUT` seguidas devolvem o mesmo `liquidadoEm`, 404 para recebível inexistente. Collection Bruno
     ganhou "Liquidar recebivel" (`seq: 7`), com docs explicando como demonstrar a idempotência na
     prática; `npx @usebruno/cli run --env Local -r` → 7/7 passando.
-  - **Pendente, por pedido explícito do usuário**: nada commitado/enviado ao repositório ainda —
-    o usuário pediu para revisar/testar antes de qualquer push. `SPEC.md` (item 6 revisado + item 9
-    novo) e este arquivo já refletem as decisões tomadas.
+  - Após revisão do usuário: commit na branch `feature/liquidacao-recebivel`, PR #17, merge na
+    `main` e release **v0.3.0**.
+- **Observabilidade: métricas de negócio + infraestrutura via Micrometer, expostas ao Prometheus,
+  visualizadas no Grafana (dashboard já provisionado)** — pedido do usuário. Decisões completas em
+  SPEC.md item 10; resumo técnico aqui:
+  - Dependências novas: `spring-boot-starter-actuator` + `micrometer-registry-prometheus`.
+    `application.yml`: só 3 endpoints do actuator expostos (`health`, `prometheus`, `info` — não o
+    `*` padrão, que vazaria `/env`/`/beans`), `management.metrics.distribution.percentiles-histogram.
+    http.server.requests=true` (sem isso `http_server_requests_seconds_bucket` não existe, e
+    `histogram_quantile` no Grafana não tem o que calcular — descoberto ao validar o dashboard
+    manualmente e ver o painel de latência p95 vazio apesar dos outros funcionarem).
+  - Nova classe `CreditEngineMetrics` (pacote `application.metrics`) encapsulando o `MeterRegistry`
+    do Micrometer com métodos de intenção (`registrarLotePrecificado`, `registrarRecebivelProcessado`,
+    `registrarValorPrecificado`, `registrarRecebivelLiquidado`) — nomes/tags de métrica centralizados
+    num único lugar, em vez de `registry.counter(...)` espalhado pelos services. Injetada em
+    `PrecificarLoteService`/`LiquidarRecebivelService` via `UseCaseConfig` (o `MeterRegistry` já vem
+    de graça, autoconfigurado pelo actuator). `MeterRegistry` é API vendor-neutral do Micrometer, não
+    anotação do Spring — mesmo racional já usado para o SLF4J direto nos services, não fere a regra
+    de aplicação livre de framework.
+  - Métricas de negócio: contadores `creditengine.lotes.precificados`/`creditengine.recebiveis.
+    processados` (tag `status`), `creditengine.recebiveis.liquidados` (tag `moeda`) e
+    `DistributionSummary` `creditengine.valor.precificado`/`creditengine.valor.liquidado` (tag
+    `moeda`, valor convertido para `double` só para fins de observabilidade — nunca em cálculo real).
+    **Idempotência também no plano de métricas**: `creditengine.recebiveis.liquidados` só incrementa
+    quando `Recebivel.liquidar()` retorna `true` (liquidação nova) — uma chamada repetida não infla o
+    contador, mesma garantia do evento de auditoria (item 9), coberto por teste.
+  - `docker-compose.yml`: serviços novos `prometheus` (scrape do backend a cada 15s, config em
+    `observability/prometheus/prometheus.yml`) e `grafana` (porta `3001` — `3000` já é do frontend),
+    com datasource e dashboard provisionados via arquivo (`observability/grafana/provisioning/`,
+    `observability/grafana/dashboards/credit-engine.json`) — abre pronto em `localhost:3001`, sem
+    nenhuma configuração manual na UI. Grafana sem login (`GF_AUTH_ANONYMOUS_ENABLED=true`, role
+    Admin), mesma decisão de "sem proteção" já adotada no resto do ambiente de desenvolvimento.
+  - Dashboard com 3 seções: **Negócio** (lotes/recebíveis por status, valor total precificado/
+    liquidado, recebíveis liquidados), **HTTP** (taxa de requisições por rota e latência **p50, p90
+    e p95** por rota, num único painel com três séries por rota) e **Infraestrutura** (memória heap
+    JVM, pool de conexões HikariCP).
+  - Testes novos: `CreditEngineMetricsTest` (unitário, `SimpleMeterRegistry` real, sem mocks) e
+    novas asserções em `PrecificarLoteServiceTest`/`LiquidarRecebivelServiceTest` (incluindo o teste
+    que prova que a repetição idempotente não duplica o contador de liquidação). `mvn test` →
+    **64/64 verdes** (eram 60).
+  - **Lição operacional registrada**: ao rodar a suíte via `docker run ... mvn -q test | tail -300`,
+    um erro real de compilação de teste (segunda chamada ao construtor de `PrecificarLoteService`
+    não atualizada) passou despercebido porque o exit code capturado era o do `tail` (sempre 0), não
+    o do `mvn` — `tail` "engole" o exit code do comando anterior no pipe sem `pipefail`. Corrigido
+    rodando com `set -o pipefail` explícito; o erro real (falha de compilação, suite inteira não
+    executada) apareceu imediatamente. Vale lembrar disso para qualquer verificação futura de
+    exit code através de um pipe com `tail`/`head`/etc á toda vez que o resultado for usado para
+    decidir se algo passou ou não.
+  - Validado manualmente via `docker compose up -d --build --force-recreate` (backend + prometheus +
+    grafana): `/actuator/health` e `/actuator/prometheus` respondendo, Prometheus com o target
+    `backend:8080` `"health":"up"`, métricas de negócio aparecendo corretamente após criar/precificar/
+    liquidar recebíveis via curl (inclusive confirmando que liquidar 2x seguidas mantém o contador em
+    `1.0`), dashboard do Grafana renderizando todos os painéis com dados reais (screenshot via Edge
+    headless) depois de gerar tráfego suficiente para os painéis baseados em `rate()`.
+  - **Pendente, por pedido do padrão já estabelecido nesta sessão**: aguardando aprovação do usuário
+    antes de commit/PR/release.
