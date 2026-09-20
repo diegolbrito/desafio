@@ -6,7 +6,12 @@ on:
   pull_request:
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  # Usa o numero da PR quando existir (evento pull_request); cai para o ref
+  # (push) caso contrario. Sem isso, uma execucao de pull_request disparada
+  # tardiamente pelo GitHub (ex.: logo apos o merge da propria PR) pode acabar
+  # no mesmo grupo de uma execucao de push na main e cancela-la sem motivo -
+  # foi exatamente o que aconteceu na primeira rodada real deste workflow.
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
