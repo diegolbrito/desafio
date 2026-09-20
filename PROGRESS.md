@@ -5,10 +5,12 @@ Decisões de negócio/arquitetura ficam registradas em `SPEC.md` (seção "Premi
 ficam apenas decisões técnicas pontuais tomadas durante a construção.
 
 ## Status geral
-**Todas as 8 etapas do plano original concluídas.** Backend (hexagonal, Spring Boot 4.1/Java 25) e
+**Todas as 8 etapas do plano original concluídas**, mais a feature de liquidação (pós-MVP, ver
+final da seção "Concluído" e SPEC.md item 9). Backend (hexagonal, Spring Boot 4.1/Java 25) e
 frontend (React 19.3/TS) implementados, testados e validados end-to-end via `docker-compose`
-completo (db + backend + frontend). Não há próxima etapa planejada; próximos passos ficariam a
-critério do usuário (ex.: revisão geral, ajustes de UX, deploy real).
+completo (db + backend + frontend). A feature de liquidação está implementada e testada
+(60/60 backend, ver detalhe abaixo) mas **ainda não commitada/enviada ao repositório** — aguardando
+revisão/teste do usuário antes de qualquer commit/push, por pedido explícito dele.
 
 ## Concluído
 - [x] SPEC.md revisado; seção "Premissas adotadas" preenchida (fórmula de deságio, categorias de
@@ -557,3 +559,63 @@ critério do usuário (ex.: revisão geral, ajustes de UX, deploy real).
     detalhe, incluindo o cenário cross-currency (valor presente em USD, deságio em BRL).
   - `SPEC.md` ("Arquitetura Frontend e decisões" > "Design system") atualizado para refletir a
     stack real.
+- **Feature nova: liquidação de recebível, com idempotência obrigatória** (pedido do usuário —
+  reverte parte do item 6 do SPEC.md, "liquidação fora do MVP"). Requisito explícito: a mesma
+  requisição repetida (retry de rede, duplo clique) não pode gerar duas liquidações. Decisões
+  completas documentadas em `SPEC.md`, novo item 9 — resumo técnico aqui:
+  - Domínio: novo `StatusRecebivel.LIQUIDADO` e campo `liquidadoEm` em `Recebivel`. Novo método
+    `Recebivel.liquidar(OffsetDateTime)`: se já `LIQUIDADO`, retorna `false` sem lançar exceção nem
+    alterar estado (idempotente); se não `PRECIFICADO`, lança `LiquidacaoInvalidaException` (nova,
+    estende `DomainException` → 422); caso contrário transiciona e retorna `true`. Novo
+    `Recebivel.reconstituir(...)` (factory de rehidratação a partir do estado persistido, distinta
+    de `criar()` que sempre valida e começa `PENDENTE`) — necessário porque, ao contrário das
+    demais features, esta precisa reidratar um agregado já existente para aplicar uma transição,
+    não só criar um novo.
+  - Aplicação: `LiquidarRecebivelUseCase`/`LiquidarRecebivelPort` (buscar-para-liquidar + salvar) +
+    `LiquidarRecebivelService`, seguindo exatamente o padrão dos demais casos de uso. Só registra
+    `EventoTransacao.recebivelLiquidado` (novo `TipoEventoTransacao.RECEBIVEL_LIQUIDADO`) quando a
+    liquidação foi efetivamente realizada agora — uma chamada idempotente repetida não duplica o
+    evento de auditoria.
+  - Persistência: `RecebivelJpaRepository` novo (não existia repositório JPA dedicado a
+    `RecebivelEntity` — só era acessado em cascata via `LoteRecebivelJpaRepository`), com
+    `buscarParaLiquidar` usando `@Lock(PESSIMISTIC_WRITE)` (`SELECT ... FOR UPDATE`). Nova
+    migration `V202609181009__adicionar_liquidacao_recebivel.sql`: coluna `liquidado_em`, e
+    `ck_recebivel_status`/`ck_transacao_evento_tipo` recriados (drop+add) incluindo os novos
+    valores — **erro cometido e corrigido durante a implementação**: esqueci de atualizar o
+    segundo constraint na primeira versão da migration, o que só apareceu como `500` (não `422`)
+    no teste de integração de repetição idempotente (`ConstraintViolationException` ao tentar
+    inserir `RECEBIVEL_LIQUIDADO` em `transacao_evento`) — a suíte de testes pegou o problema antes
+    de qualquer commit, exatamente como o gate pedido pelo usuário deveria funcionar.
+  - Web: endpoint `PUT /api/v1/lotes-recebiveis/{loteId}/recebiveis/{recebivelId}/liquidacao` (PUT,
+    não POST — ver SPEC.md item 9 para o raciocínio completo sobre por que isso substitui a
+    necessidade de um cabeçalho `Idempotency-Key`). Resposta 200 tanto na liquidação real quanto na
+    repetição idempotente; 404 se lote/recebível não existir ou não corresponderem entre si; 422 se
+    o recebível não estiver `PRECIFICADO` (nunca precificado ou rejeitado).
+  - Testes novos: `RecebivelTest` (liquidar feliz, idempotente — não sobrescreve `liquidadoEm` numa
+    segunda chamada —, rejeita PENDENTE/REJEITADO), `LiquidarRecebivelServiceTest` (Mockito: não
+    encontrado, liquidação registra evento, repetição não registra novo evento),
+    `PersistenciaIntegrationTest` (busca com lock + salvar via adapter real), e em
+    `LoteRecebiveisControllerIntegrationTest`: fluxo feliz, **duas chamadas HTTP sequenciais
+    confirmando o mesmo `liquidadoEm`** (é o teste que prova o requisito central do pedido), 422
+    para nunca-precificado, 404 para recebível inexistente e para recebível de outro lote.
+    `mvn test` → 60/60 verdes (eram 45 antes desta feature).
+  - **Ressalva documentada** (mesma honestidade já usada para o `@Transactional` do lote): não há
+    teste automatizado de duas requisições *de fato* concorrentes (threads/conexões simultâneas)
+    provando o comportamento do lock pessimista sob corrida real — só o teste sequencial (chamar
+    duas vezes seguidas) e a leitura do mecanismo. Registrado em SPEC.md item 9.
+  - Frontend: `liquidarRecebivel` (PUT) em `lotesRecebiveisApi.ts`, hook `useLiquidarRecebivel`
+    (invalida a query de detalhe no sucesso), botão "Liquidar" em `LoteRecebiveisDetalhe` (só
+    aparece para itens `PRECIFICADO`, desabilitado durante a mutação), nova coluna "Liquidado em"
+    (`formatarDataHora`, já existente), novo status `LIQUIDADO` no `StatusBadge` (azul, distinto do
+    verde de `PRECIFICADO`) e em `TEXTOS`. `openapi.yaml`/`schema.d.ts` regenerados do backend real
+    (endpoint novo, `status` com `LIQUIDADO`, campo `liquidadoEm`). Testes novos em
+    `LoteRecebiveisDetalhe.test.tsx`: botão aciona a mutation com os ids corretos, não aparece para
+    itens não-`PRECIFICADO`, mensagem de erro quando a liquidação falha.
+  - Validado manualmente via `curl` contra o backend real (`docker compose up -d --build
+    --force-recreate db backend`, volume recriado por causa da migration nova): 3 chamadas
+    `PUT` seguidas devolvem o mesmo `liquidadoEm`, 404 para recebível inexistente. Collection Bruno
+    ganhou "Liquidar recebivel" (`seq: 7`), com docs explicando como demonstrar a idempotência na
+    prática; `npx @usebruno/cli run --env Local -r` → 7/7 passando.
+  - **Pendente, por pedido explícito do usuário**: nada commitado/enviado ao repositório ainda —
+    o usuário pediu para revisar/testar antes de qualquer push. `SPEC.md` (item 6 revisado + item 9
+    novo) e este arquivo já refletem as decisões tomadas.

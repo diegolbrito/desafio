@@ -12,6 +12,7 @@ import com.srmasset.creditengine.domain.Moeda;
 import com.srmasset.creditengine.domain.Recebivel;
 import com.srmasset.creditengine.domain.ResultadoDesagio;
 import com.srmasset.creditengine.domain.StatusLote;
+import com.srmasset.creditengine.domain.StatusRecebivel;
 import com.srmasset.creditengine.domain.TipoEventoTransacao;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,9 +28,12 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.byLessThan;
 
 /**
  * Sobe um Postgres real via Testcontainers e roda as migrations Flyway de
@@ -64,6 +68,8 @@ class PersistenciaIntegrationTest {
     private LoteRecebivelJpaRepository loteRepository;
     @Autowired
     private TransacaoEventoJpaRepository eventoRepository;
+    @Autowired
+    private RecebivelLiquidacaoPersistenceAdapter liquidacaoAdapter;
 
     @Test
     void seedsDeTaxaBaseEstaoDisponiveis() {
@@ -145,5 +151,43 @@ class PersistenciaIntegrationTest {
         assertThat(lote.getStatus()).isEqualTo(StatusLote.PRECIFICADO);
         assertThat(lote.getRecebiveis().get(0).getValorPresente()).isNotNull();
         assertThat(eventoRepository.findAll()).hasSize(3); // lote_recebido + recebivel_precificado + lote_precificado
+    }
+
+    @Test
+    void buscarParaLiquidarERecuperarEstadoPersistidoDeUmRecebivelPrecificado() {
+        Recebivel recebivel = Recebivel.criar("Ativo Teste", new BigDecimal("1000.00"),
+                LocalDate.now().plusDays(30), CategoriaRisco.B);
+        recebivel.aplicarPrecificacao(new ResultadoDesagio(
+                new BigDecimal("950.00"), new BigDecimal("50.00"), new BigDecimal("0.105000")));
+        LoteRecebiveis lote = LoteRecebiveis.criar(LocalDate.now(), List.of(recebivel));
+        lote.marcarPrecificado();
+        LoteRecebiveis salvo = loteAdapter.salvar(lote);
+        UUID recebivelId = salvo.getRecebiveis().get(0).getId();
+
+        Recebivel encontrado = liquidacaoAdapter.buscarParaLiquidar(salvo.getId(), recebivelId).orElseThrow();
+
+        assertThat(encontrado.getStatus()).isEqualTo(StatusRecebivel.PRECIFICADO);
+        assertThat(encontrado.getValorPresente()).isEqualByComparingTo("950.00");
+    }
+
+    @Test
+    void salvarLiquidacaoPersisteStatusLiquidadoEInstante() {
+        Recebivel recebivel = Recebivel.criar("Ativo Teste", new BigDecimal("1000.00"),
+                LocalDate.now().plusDays(30), CategoriaRisco.B);
+        recebivel.aplicarPrecificacao(new ResultadoDesagio(
+                new BigDecimal("950.00"), new BigDecimal("50.00"), new BigDecimal("0.105000")));
+        LoteRecebiveis lote = LoteRecebiveis.criar(LocalDate.now(), List.of(recebivel));
+        lote.marcarPrecificado();
+        LoteRecebiveis salvo = loteAdapter.salvar(lote);
+        UUID recebivelId = salvo.getRecebiveis().get(0).getId();
+
+        Recebivel paraLiquidar = liquidacaoAdapter.buscarParaLiquidar(salvo.getId(), recebivelId).orElseThrow();
+        OffsetDateTime agora = OffsetDateTime.now();
+        paraLiquidar.liquidar(agora);
+        liquidacaoAdapter.salvar(paraLiquidar);
+
+        var persistido = loteRepository.buscarComRecebiveisPorId(salvo.getId()).orElseThrow().getRecebiveis().get(0);
+        assertThat(persistido.getStatus()).isEqualTo(StatusRecebivel.LIQUIDADO);
+        assertThat(persistido.getLiquidadoEm()).isCloseTo(agora, byLessThan(1, ChronoUnit.SECONDS));
     }
 }

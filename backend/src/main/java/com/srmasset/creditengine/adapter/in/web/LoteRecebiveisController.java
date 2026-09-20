@@ -5,9 +5,11 @@ import com.srmasset.creditengine.adapter.in.web.dto.LoteRecebiveisResponse;
 import com.srmasset.creditengine.adapter.in.web.dto.LoteRecebiveisResumoResponse;
 import com.srmasset.creditengine.adapter.in.web.dto.PaginaResponse;
 import com.srmasset.creditengine.adapter.in.web.dto.RecebivelRequest;
+import com.srmasset.creditengine.adapter.in.web.dto.RecebivelResponse;
 import com.srmasset.creditengine.adapter.in.web.exception.RecursoNaoEncontradoException;
 import com.srmasset.creditengine.application.port.in.BuscarLoteRecebiveisUseCase;
 import com.srmasset.creditengine.application.port.in.ComandoPrecificarLote;
+import com.srmasset.creditengine.application.port.in.LiquidarRecebivelUseCase;
 import com.srmasset.creditengine.application.port.in.ListarLotesRecebiveisUseCase;
 import com.srmasset.creditengine.application.port.in.PrecificarLoteUseCase;
 import com.srmasset.creditengine.application.port.out.DirecaoOrdenacao;
@@ -21,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -45,13 +48,16 @@ public class LoteRecebiveisController {
     private final PrecificarLoteUseCase precificarLoteUseCase;
     private final ListarLotesRecebiveisUseCase listarLotesUseCase;
     private final BuscarLoteRecebiveisUseCase buscarLoteUseCase;
+    private final LiquidarRecebivelUseCase liquidarRecebivelUseCase;
 
     public LoteRecebiveisController(PrecificarLoteUseCase precificarLoteUseCase,
                                      ListarLotesRecebiveisUseCase listarLotesUseCase,
-                                     BuscarLoteRecebiveisUseCase buscarLoteUseCase) {
+                                     BuscarLoteRecebiveisUseCase buscarLoteUseCase,
+                                     LiquidarRecebivelUseCase liquidarRecebivelUseCase) {
         this.precificarLoteUseCase = precificarLoteUseCase;
         this.listarLotesUseCase = listarLotesUseCase;
         this.buscarLoteUseCase = buscarLoteUseCase;
+        this.liquidarRecebivelUseCase = liquidarRecebivelUseCase;
     }
 
     @PostMapping
@@ -93,6 +99,23 @@ public class LoteRecebiveisController {
                 .map(LoteRecebiveisResponse::from)
                 .orElseThrow(() -> new RecursoNaoEncontradoException(
                         "Lote de recebiveis nao encontrado: " + id));
+    }
+
+    @PutMapping("/{loteId}/recebiveis/{recebivelId}/liquidacao")
+    @Transactional
+    @Operation(summary = "Liquida um recebivel precificado",
+            description = "Marca o recebivel como LIQUIDADO (paga o valorPresente ao cedente, na moeda de "
+                    + "pagamento). PUT em vez de POST deliberadamente: a operacao e' idempotente - chamar "
+                    + "novamente um recebivel ja liquidado (retry de rede, duplo clique) retorna 200 com o "
+                    + "mesmo resultado, sem gerar uma nova liquidacao ou efeito colateral (ver SPEC.md).")
+    @ApiResponse(responseCode = "200", description = "Recebivel liquidado (ou ja estava liquidado - idempotente)")
+    @ApiResponse(responseCode = "404", description = "Lote ou recebivel nao encontrado")
+    @ApiResponse(responseCode = "422", description = "Recebivel nao esta PRECIFICADO (nunca precificado ou rejeitado)")
+    public RecebivelResponse liquidar(@PathVariable UUID loteId, @PathVariable UUID recebivelId) {
+        return liquidarRecebivelUseCase.liquidar(loteId, recebivelId)
+                .map(RecebivelResponse::from)
+                .orElseThrow(() -> new RecursoNaoEncontradoException(
+                        "Recebivel nao encontrado no lote informado: loteId=" + loteId + ", recebivelId=" + recebivelId));
     }
 
     private ComandoPrecificarLote paraComando(LoteRecebiveisRequest request) {

@@ -11,6 +11,49 @@ tags:
 - name: Lotes de recebiveis
   description: "Recebimento, precificacao e consulta de lotes de recebiveis"
 paths:
+  /api/v1/lotes-recebiveis/{loteId}/recebiveis/{recebivelId}/liquidacao:
+    put:
+      tags:
+      - Lotes de recebiveis
+      summary: Liquida um recebivel precificado
+      description: "Marca o recebivel como LIQUIDADO (paga o valorPresente ao cedente,\
+        \ na moeda de pagamento). PUT em vez de POST deliberadamente: a operacao e'\
+        \ idempotente - chamar novamente um recebivel ja liquidado (retry de rede,\
+        \ duplo clique) retorna 200 com o mesmo resultado, sem gerar uma nova liquidacao\
+        \ ou efeito colateral (ver SPEC.md)."
+      operationId: liquidar
+      parameters:
+      - name: loteId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: recebivelId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: Recebivel liquidado (ou ja estava liquidado - idempotente)
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/RecebivelResponse"
+        "404":
+          description: Lote ou recebivel nao encontrado
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/RecebivelResponse"
+        "422":
+          description: Recebivel nao esta PRECIFICADO (nunca precificado ou rejeitado)
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/RecebivelResponse"
   /api/v1/lotes-recebiveis:
     get:
       tags:
@@ -89,6 +132,69 @@ paths:
                 $ref: "#/components/schemas/LoteRecebiveisResponse"
 components:
   schemas:
+    RecebivelResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        ativo:
+          type: string
+        valorBruto:
+          type: string
+          example: "15000.00"
+        moeda:
+          type: string
+          enum:
+          - BRL
+          - USD
+        dataVencimento:
+          type: string
+          format: date
+        categoriaRisco:
+          type: string
+          enum:
+          - AA
+          - A
+          - B
+          - C
+          - D
+          - E
+        status:
+          type: string
+          enum:
+          - PENDENTE
+          - PRECIFICADO
+          - REJEITADO
+          - LIQUIDADO
+        valorPresente:
+          type: string
+          example: "14200.00"
+        valorDesagio:
+          type: string
+          example: "800.00"
+        taxaDescontoAplicada:
+          type: string
+          example: "0.146500"
+        motivoRejeicao:
+          type: string
+        moedaPagamento:
+          type: string
+          description: Moeda em que o recebivel e' efetivamente pago; igual a `moeda`
+            quando nao ha conversao cambial.
+          enum:
+          - BRL
+          - USD
+        cotacaoCambio:
+          type: string
+          description: Cotacao (BRL por 1 USD) usada na conversao; null quando moedaPagamento
+            == moeda.
+          example: "5.20"
+        liquidadoEm:
+          type: string
+          format: date-time
+          description: Data/hora em que o recebivel foi liquidado (pago ao cedente);
+            null enquanto nao liquidado.
     LoteRecebiveisRequest:
       type: object
       properties:
@@ -152,63 +258,6 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/RecebivelResponse"
-    RecebivelResponse:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        ativo:
-          type: string
-        valorBruto:
-          type: string
-          example: "15000.00"
-        moeda:
-          type: string
-          enum:
-          - BRL
-          - USD
-        dataVencimento:
-          type: string
-          format: date
-        categoriaRisco:
-          type: string
-          enum:
-          - AA
-          - A
-          - B
-          - C
-          - D
-          - E
-        status:
-          type: string
-          enum:
-          - PENDENTE
-          - PRECIFICADO
-          - REJEITADO
-        valorPresente:
-          type: string
-          example: "14200.00"
-        valorDesagio:
-          type: string
-          example: "800.00"
-        taxaDescontoAplicada:
-          type: string
-          example: "0.146500"
-        motivoRejeicao:
-          type: string
-        moedaPagamento:
-          type: string
-          description: Moeda em que o recebivel e' efetivamente pago; igual a `moeda`
-            quando nao ha conversao cambial.
-          enum:
-          - BRL
-          - USD
-        cotacaoCambio:
-          type: string
-          description: Cotacao (BRL por 1 USD) usada na conversao; null quando moedaPagamento
-            == moeda.
-          example: "5.20"
     LoteRecebiveisResumoResponse:
       type: object
       properties:

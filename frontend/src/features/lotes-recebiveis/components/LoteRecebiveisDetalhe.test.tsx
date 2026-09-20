@@ -1,10 +1,24 @@
-import { screen } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithProviders } from '../../../shared/test/renderWithProviders'
 import * as api from '../api/lotesRecebiveisApi'
 import { LoteRecebiveisDetalhe } from './LoteRecebiveisDetalhe'
 
 vi.mock('../api/lotesRecebiveisApi')
+
+const RECEBIVEL_PRECIFICADO = {
+  id: 'rec-1',
+  ativo: 'Empresa Alfa',
+  valorBruto: '1000.00',
+  moeda: 'BRL' as const,
+  dataVencimento: '2026-12-31',
+  categoriaRisco: 'B' as const,
+  status: 'PRECIFICADO' as const,
+  valorPresente: '950.00',
+  valorDesagio: '50.00',
+  taxaDescontoAplicada: '0.105000',
+}
 
 describe('LoteRecebiveisDetalhe', () => {
   beforeEach(() => {
@@ -107,6 +121,68 @@ describe('LoteRecebiveisDetalhe', () => {
 
     expect(
       await screen.findByText('Não foi possível processar a solicitação. Tente novamente.'),
+    ).toBeInTheDocument()
+  })
+
+  it('permite liquidar um recebivel precificado e atualiza o status apos sucesso', async () => {
+    vi.mocked(api.buscarLoteRecebiveis).mockResolvedValue({
+      id: 'lote-1',
+      dataReferencia: '2026-09-18',
+      status: 'PRECIFICADO',
+      recebiveis: [RECEBIVEL_PRECIFICADO],
+    })
+    vi.mocked(api.liquidarRecebivel).mockResolvedValue({
+      ...RECEBIVEL_PRECIFICADO,
+      status: 'LIQUIDADO',
+      liquidadoEm: '2026-09-20T12:00:00Z',
+    })
+
+    renderWithProviders(<LoteRecebiveisDetalhe id="lote-1" />)
+    const usuario = userEvent.setup()
+
+    const botaoLiquidar = await screen.findByRole('button', { name: 'Liquidar' })
+    await usuario.click(botaoLiquidar)
+
+    await waitFor(() => expect(api.liquidarRecebivel).toHaveBeenCalledWith('lote-1', 'rec-1'))
+  })
+
+  it('nao mostra o botao de liquidar para recebiveis que nao estao precificados', async () => {
+    vi.mocked(api.buscarLoteRecebiveis).mockResolvedValue({
+      id: 'lote-1',
+      dataReferencia: '2026-09-18',
+      status: 'PRECIFICADO',
+      recebiveis: [
+        {
+          ...RECEBIVEL_PRECIFICADO,
+          status: 'REJEITADO',
+          motivoRejeicao: 'Data de vencimento invalida',
+        },
+      ],
+    })
+
+    renderWithProviders(<LoteRecebiveisDetalhe id="lote-1" />)
+
+    await screen.findByText('Empresa Alfa')
+    expect(screen.queryByRole('button', { name: 'Liquidar' })).not.toBeInTheDocument()
+  })
+
+  it('mostra mensagem de erro quando a liquidacao falha', async () => {
+    vi.mocked(api.buscarLoteRecebiveis).mockResolvedValue({
+      id: 'lote-1',
+      dataReferencia: '2026-09-18',
+      status: 'PRECIFICADO',
+      recebiveis: [RECEBIVEL_PRECIFICADO],
+    })
+    vi.mocked(api.liquidarRecebivel).mockRejectedValue(new Error('falhou'))
+
+    renderWithProviders(<LoteRecebiveisDetalhe id="lote-1" />)
+    const usuario = userEvent.setup()
+
+    const botaoLiquidar = await screen.findByRole('button', { name: 'Liquidar' })
+    await usuario.click(botaoLiquidar)
+
+    expect(
+      await screen.findByText('Não foi possível liquidar o recebível. Tente novamente.'),
     ).toBeInTheDocument()
   })
 })

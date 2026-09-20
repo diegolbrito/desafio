@@ -6,6 +6,7 @@ import com.srmasset.creditengine.domain.StatusRecebivel;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 /** Projecao somente-leitura de um recebivel persistido, usada pelas consultas (GET). */
@@ -13,5 +14,6 @@ public record RecebivelLeitura(UUID id, String ativo, BigDecimal valorBruto, Moe
                                 LocalDate dataVencimento, CategoriaRisco categoriaRisco,
                                 StatusRecebivel status, BigDecimal valorPresente,
                                 BigDecimal valorDesagio, BigDecimal taxaDescontoAplicada,
-                                String motivoRejeicao, Moeda moedaPagamento, BigDecimal cotacaoCambio) {
+                                String motivoRejeicao, Moeda moedaPagamento, BigDecimal cotacaoCambio,
+                                OffsetDateTime liquidadoEm) {
 }

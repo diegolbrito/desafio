@@ -1,0 +1,33 @@
+meta {
+  name: Liquidar recebivel
+  type: http
+  seq: 7
+}
+
+put {
+  url: {{baseUrl}}/api/v1/lotes-recebiveis/:loteId/recebiveis/:recebivelId/liquidacao
+  body: none
+  auth: none
+}
+
+params:path {
+  loteId: 00000000-0000-0000-0000-000000000000
+  recebivelId: 00000000-0000-0000-0000-000000000000
+}
+
+docs {
+  Liquida (paga o valorPresente ao cedente) um recebivel PRECIFICADO. Troque
+  "loteId" e "recebivelId" (aba Params) pelos ids retornados por "Criar lote".
+
+  PUT em vez de POST deliberadamente: a operacao e' idempotente (ver SPEC.md,
+  "Premissas adotadas" item 9) - envie a mesma requisicao de novo (retry de
+  rede, duplo clique) e ela retorna 200 com o mesmo resultado (mesmo
+  `liquidadoEm`), sem gerar uma segunda liquidacao. Para conferir isso na
+  pratica, rode esta request duas vezes seguidas e compare o campo
+  `liquidadoEm` da resposta.
+
+  Retorna 404 se o lote/recebivel nao existir (ou o recebivel nao pertencer ao
+  lote informado), e 422 se o recebivel nunca foi precificado (PENDENTE) ou foi
+  rejeitado (REJEITADO) - so' quem esta PRECIFICADO (ou ja LIQUIDADO, de forma
+  idempotente) pode ser liquidado.
+}

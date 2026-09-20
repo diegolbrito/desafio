@@ -4,6 +4,26 @@
  */
 
 export interface paths {
+    "/api/v1/lotes-recebiveis/{loteId}/recebiveis/{recebivelId}/liquidacao": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Liquida um recebivel precificado
+         * @description Marca o recebivel como LIQUIDADO (paga o valorPresente ao cedente, na moeda de pagamento). PUT em vez de POST deliberadamente: a operacao e' idempotente - chamar novamente um recebivel ja liquidado (retry de rede, duplo clique) retorna 200 com o mesmo resultado, sem gerar uma nova liquidacao ou efeito colateral (ver SPEC.md).
+         */
+        put: operations["liquidar"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/lotes-recebiveis": {
         parameters: {
             query?: never;
@@ -49,6 +69,43 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        RecebivelResponse: {
+            /** Format: uuid */
+            id?: string;
+            ativo?: string;
+            /** @example 15000.00 */
+            valorBruto?: string;
+            /** @enum {string} */
+            moeda?: "BRL" | "USD";
+            /** Format: date */
+            dataVencimento?: string;
+            /** @enum {string} */
+            categoriaRisco?: "AA" | "A" | "B" | "C" | "D" | "E";
+            /** @enum {string} */
+            status?: "PENDENTE" | "PRECIFICADO" | "REJEITADO" | "LIQUIDADO";
+            /** @example 14200.00 */
+            valorPresente?: string;
+            /** @example 800.00 */
+            valorDesagio?: string;
+            /** @example 0.146500 */
+            taxaDescontoAplicada?: string;
+            motivoRejeicao?: string;
+            /**
+             * @description Moeda em que o recebivel e' efetivamente pago; igual a `moeda` quando nao ha conversao cambial.
+             * @enum {string}
+             */
+            moedaPagamento?: "BRL" | "USD";
+            /**
+             * @description Cotacao (BRL por 1 USD) usada na conversao; null quando moedaPagamento == moeda.
+             * @example 5.20
+             */
+            cotacaoCambio?: string;
+            /**
+             * Format: date-time
+             * @description Data/hora em que o recebivel foi liquidado (pago ao cedente); null enquanto nao liquidado.
+             */
+            liquidadoEm?: string;
+        };
         LoteRecebiveisRequest: {
             recebiveis: components["schemas"]["RecebivelRequest"][];
         };
@@ -74,38 +131,6 @@ export interface components {
             /** @enum {string} */
             status?: "RECEBIDO" | "PRECIFICADO" | "ERRO";
             recebiveis?: components["schemas"]["RecebivelResponse"][];
-        };
-        RecebivelResponse: {
-            /** Format: uuid */
-            id?: string;
-            ativo?: string;
-            /** @example 15000.00 */
-            valorBruto?: string;
-            /** @enum {string} */
-            moeda?: "BRL" | "USD";
-            /** Format: date */
-            dataVencimento?: string;
-            /** @enum {string} */
-            categoriaRisco?: "AA" | "A" | "B" | "C" | "D" | "E";
-            /** @enum {string} */
-            status?: "PENDENTE" | "PRECIFICADO" | "REJEITADO";
-            /** @example 14200.00 */
-            valorPresente?: string;
-            /** @example 800.00 */
-            valorDesagio?: string;
-            /** @example 0.146500 */
-            taxaDescontoAplicada?: string;
-            motivoRejeicao?: string;
-            /**
-             * @description Moeda em que o recebivel e' efetivamente pago; igual a `moeda` quando nao ha conversao cambial.
-             * @enum {string}
-             */
-            moedaPagamento?: "BRL" | "USD";
-            /**
-             * @description Cotacao (BRL por 1 USD) usada na conversao; null quando moedaPagamento == moeda.
-             * @example 5.20
-             */
-            cotacaoCambio?: string;
         };
         LoteRecebiveisResumoResponse: {
             /** Format: uuid */
@@ -137,6 +162,47 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    liquidar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                loteId: string;
+                recebivelId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Recebivel liquidado (ou ja estava liquidado - idempotente) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RecebivelResponse"];
+                };
+            };
+            /** @description Lote ou recebivel nao encontrado */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RecebivelResponse"];
+                };
+            };
+            /** @description Recebivel nao esta PRECIFICADO (nunca precificado ou rejeitado) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RecebivelResponse"];
+                };
+            };
+        };
+    };
     listar: {
         parameters: {
             query?: {

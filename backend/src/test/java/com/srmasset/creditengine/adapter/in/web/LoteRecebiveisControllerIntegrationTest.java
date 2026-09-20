@@ -1,5 +1,7 @@
 package com.srmasset.creditengine.adapter.in.web;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -19,6 +21,7 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -42,6 +45,30 @@ class LoteRecebiveisControllerIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    private JsonNode criarLotePrecificado() throws Exception {
+        String payload = """
+                {
+                  "recebiveis": [
+                    {
+                      "ativo": "Ativo Liquidacao",
+                      "valorBruto": "1000.00",
+                      "moeda": "BRL",
+                      "dataVencimento": "%s",
+                      "categoriaRisco": "B"
+                    }
+                  ]
+                }
+                """.formatted(LocalDate.now().plusDays(60));
+
+        String body = mockMvc.perform(post("/api/v1/lotes-recebiveis")
+                        .contentType("application/json")
+                        .content(payload))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        return objectMapper.readTree(body);
+    }
 
     @Test
     void criaEPrecificaLoteComSucesso() throws Exception {
@@ -176,5 +203,84 @@ class LoteRecebiveisControllerIntegrationTest {
                 .andExpect(jsonPath("$.content").isArray())
                 .andExpect(jsonPath("$.page").value(0))
                 .andExpect(jsonPath("$.size").value(20));
+    }
+
+    @Test
+    void liquidaRecebivelPrecificadoComSucesso() throws Exception {
+        JsonNode lote = criarLotePrecificado();
+        String loteId = lote.get("id").asText();
+        String recebivelId = lote.get("recebiveis").get(0).get("id").asText();
+
+        mockMvc.perform(put("/api/v1/lotes-recebiveis/{loteId}/recebiveis/{recebivelId}/liquidacao", loteId, recebivelId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("LIQUIDADO"))
+                .andExpect(jsonPath("$.liquidadoEm").exists());
+    }
+
+    @Test
+    void requisicaoRepetidaDeLiquidacaoEhIdempotenteENaoDuplicaOEvento() throws Exception {
+        JsonNode lote = criarLotePrecificado();
+        String loteId = lote.get("id").asText();
+        String recebivelId = lote.get("recebiveis").get(0).get("id").asText();
+
+        String primeiraResposta = mockMvc.perform(put(
+                        "/api/v1/lotes-recebiveis/{loteId}/recebiveis/{recebivelId}/liquidacao", loteId, recebivelId))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String liquidadoEmOriginal = objectMapper.readTree(primeiraResposta).get("liquidadoEm").asText();
+
+        // mesma requisicao repetida (retry de rede / duplo clique): mesmo resultado, sem duplicar
+        mockMvc.perform(put(
+                        "/api/v1/lotes-recebiveis/{loteId}/recebiveis/{recebivelId}/liquidacao", loteId, recebivelId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("LIQUIDADO"))
+                .andExpect(jsonPath("$.liquidadoEm").value(liquidadoEmOriginal));
+    }
+
+    @Test
+    void liquidarRecebivelNuncaPrecificadoRetorna422() throws Exception {
+        String payload = """
+                {
+                  "recebiveis": [
+                    {
+                      "ativo": "Ativo Rejeitado",
+                      "valorBruto": "500.00",
+                      "moeda": "BRL",
+                      "dataVencimento": "%s",
+                      "categoriaRisco": "A"
+                    }
+                  ]
+                }
+                """.formatted(LocalDate.now());
+
+        String body = mockMvc.perform(post("/api/v1/lotes-recebiveis")
+                        .contentType("application/json")
+                        .content(payload))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        JsonNode lote = objectMapper.readTree(body);
+        String loteId = lote.get("id").asText();
+        String recebivelId = lote.get("recebiveis").get(0).get("id").asText();
+
+        mockMvc.perform(put("/api/v1/lotes-recebiveis/{loteId}/recebiveis/{recebivelId}/liquidacao", loteId, recebivelId))
+                .andExpect(status().is(422));
+    }
+
+    @Test
+    void liquidarRecebivelInexistenteRetorna404() throws Exception {
+        mockMvc.perform(put("/api/v1/lotes-recebiveis/{loteId}/recebiveis/{recebivelId}/liquidacao",
+                        UUID.randomUUID(), UUID.randomUUID()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("Recurso nao encontrado"));
+    }
+
+    @Test
+    void liquidarRecebivelDeOutroLoteRetorna404() throws Exception {
+        JsonNode lote = criarLotePrecificado();
+        String recebivelId = lote.get("recebiveis").get(0).get("id").asText();
+
+        mockMvc.perform(put("/api/v1/lotes-recebiveis/{loteId}/recebiveis/{recebivelId}/liquidacao",
+                        UUID.randomUUID(), recebivelId))
+                .andExpect(status().isNotFound());
     }
 }

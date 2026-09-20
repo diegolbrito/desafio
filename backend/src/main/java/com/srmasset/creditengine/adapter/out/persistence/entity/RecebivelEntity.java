@@ -78,6 +78,9 @@ public class RecebivelEntity {
     @Column(name = "cotacao_cambio")
     private BigDecimal cotacaoCambio;
 
+    @Column(name = "liquidado_em")
+    private OffsetDateTime liquidadoEm;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
@@ -117,6 +120,12 @@ public class RecebivelEntity {
 
     void atribuirLoteRecebivel(LoteRecebivelEntity loteRecebivel) {
         this.loteRecebivel = loteRecebivel;
+    }
+
+    /** Aplica a transicao de liquidacao vinda do dominio (ver Recebivel#liquidar). */
+    public void aplicarLiquidacao(StatusRecebivel status, OffsetDateTime liquidadoEm) {
+        this.status = status;
+        this.liquidadoEm = liquidadoEm;
     }
 
     public UUID getId() {
@@ -169,5 +178,9 @@ public class RecebivelEntity {
 
     public BigDecimal getCotacaoCambio() {
         return cotacaoCambio;
+    }
+
+    public OffsetDateTime getLiquidadoEm() {
+        return liquidadoEm;
     }
 }

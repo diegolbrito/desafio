@@ -1,11 +1,15 @@
 package com.srmasset.creditengine.domain;
 
+import com.srmasset.creditengine.domain.exception.LiquidacaoInvalidaException;
 import com.srmasset.creditengine.domain.exception.PrazoInvalidoException;
 import com.srmasset.creditengine.domain.exception.RecebivelInvalidoException;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -143,5 +147,53 @@ class RecebivelTest {
 
         assertThatThrownBy(() -> recebivel.aplicarPrecificacao(resultado))
                 .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void liquidarTransicionaDePrecificadoParaLiquidadoESnapshotaOInstante() {
+        Recebivel recebivel = recebivelValido();
+        recebivel.aplicarPrecificacao(new ResultadoDesagio(
+                new BigDecimal("950.00"), new BigDecimal("50.00"), new BigDecimal("0.105000")));
+        OffsetDateTime agora = OffsetDateTime.ofInstant(Instant.parse("2026-09-20T12:00:00Z"), ZoneOffset.UTC);
+
+        boolean liquidadoAgora = recebivel.liquidar(agora);
+
+        assertThat(liquidadoAgora).isTrue();
+        assertThat(recebivel.getStatus()).isEqualTo(StatusRecebivel.LIQUIDADO);
+        assertThat(recebivel.getLiquidadoEm()).isEqualTo(agora);
+    }
+
+    @Test
+    void liquidarEhIdempotenteQuandoJaLiquidado() {
+        Recebivel recebivel = recebivelValido();
+        recebivel.aplicarPrecificacao(new ResultadoDesagio(
+                new BigDecimal("950.00"), new BigDecimal("50.00"), new BigDecimal("0.105000")));
+        OffsetDateTime primeiraLiquidacao = OffsetDateTime.ofInstant(Instant.parse("2026-09-20T12:00:00Z"), ZoneOffset.UTC);
+        recebivel.liquidar(primeiraLiquidacao);
+
+        OffsetDateTime segundaTentativa = OffsetDateTime.ofInstant(Instant.parse("2026-09-21T08:00:00Z"), ZoneOffset.UTC);
+        boolean liquidadoNaSegundaChamada = recebivel.liquidar(segundaTentativa);
+
+        assertThat(liquidadoNaSegundaChamada).isFalse();
+        assertThat(recebivel.getStatus()).isEqualTo(StatusRecebivel.LIQUIDADO);
+        // repetir a chamada nao pode sobrescrever o instante da liquidacao original
+        assertThat(recebivel.getLiquidadoEm()).isEqualTo(primeiraLiquidacao);
+    }
+
+    @Test
+    void naoPermiteLiquidarRecebivelPendente() {
+        Recebivel recebivel = recebivelValido();
+
+        assertThatThrownBy(() -> recebivel.liquidar(OffsetDateTime.now()))
+                .isInstanceOf(LiquidacaoInvalidaException.class);
+    }
+
+    @Test
+    void naoPermiteLiquidarRecebivelRejeitado() {
+        Recebivel recebivel = recebivelValido();
+        recebivel.rejeitar("Data de vencimento invalida");
+
+        assertThatThrownBy(() -> recebivel.liquidar(OffsetDateTime.now()))
+                .isInstanceOf(LiquidacaoInvalidaException.class);
     }
 }

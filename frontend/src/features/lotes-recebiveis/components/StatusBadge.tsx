@@ -10,6 +10,7 @@ const CLASSES_POR_STATUS: Record<Status, string> = {
   ERRO: '',
   PENDENTE: '',
   REJEITADO: '',
+  LIQUIDADO: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
 }
 
 interface StatusBadgeProps {

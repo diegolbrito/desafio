@@ -39,4 +39,11 @@ public record EventoTransacao(TipoEventoTransacao tipo, UUID loteId, UUID recebi
         return new EventoTransacao(TipoEventoTransacao.RECEBIVEL_REJEITADO, loteId, recebivel.getId(),
                 "Recebivel rejeitado: " + recebivel.getMotivoRejeicao(), agora);
     }
+
+    public static EventoTransacao recebivelLiquidado(UUID loteId, Recebivel recebivel, OffsetDateTime agora) {
+        return new EventoTransacao(TipoEventoTransacao.RECEBIVEL_LIQUIDADO, loteId, recebivel.getId(),
+                "Recebivel liquidado: valorPresente=%s %s".formatted(
+                        recebivel.getValorPresente(), recebivel.getMoedaPagamento()),
+                agora);
+    }
 }
