@@ -1,4 +1,4 @@
-# $$$$$$$$ Credit Engine
+# Credit Engine
 
 [![CI](https://github.com/diegolbrito/desafio/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/diegolbrito/desafio/actions/workflows/ci.yml)
 
@@ -90,7 +90,7 @@ docker compose down -v    # idem, mas também apaga o volume do banco (reset tot
 | Métricas (Prometheus format) | http://localhost:8080/actuator/prometheus |
 | Health check | http://localhost:8080/actuator/health |
 | Prometheus | http://localhost:9090 |
-| Grafana (dashboard "$$$$$$$$ Credit Engine" já provisionado) | http://localhost:3001 |
+| Grafana (dashboard "  Credit Engine" já provisionado) | http://localhost:3001 |
 | Mock da cotação de câmbio (WireMock) | http://localhost:8089/api/v1/cotacoes/USD-BRL |
 
 ## Simular indisponibilidade do serviço de cotação de câmbio

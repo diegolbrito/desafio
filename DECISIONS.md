@@ -1,4 +1,4 @@
-# DECISIONS.md — $$$$$$$$ Credit Engine
+# DECISIONS.md — Credit Engine
 
 Registro de decisões importantes tomadas durante o projeto: arquiteturais, de segurança, de
 processo, com o contexto e a justificativa por trás de cada uma. Diferente do [`SPEC.md`](SPEC.md)
