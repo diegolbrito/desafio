@@ -13,7 +13,7 @@ import java.time.LocalDate;
 /**
  * Data de vencimento nao tem validacao de "deve ser futura" aqui de proposito:
  * essa regra e' de negocio (rejeita so o item, sem abortar o lote - ver SPEC.md
- * "Premissas adotadas" item 5) e e' aplicada no dominio (Recebivel.calcularPrazoDias),
+ * "Premissas adotadas" item 5) e e' aplicada no dominio (Recebivel.calcularPrazoMeses),
  * nao na validacao estrutural do payload.
  *
  * <p>Campos BigDecimal levam {@code @Schema(type = "string")} porque o swagger-core

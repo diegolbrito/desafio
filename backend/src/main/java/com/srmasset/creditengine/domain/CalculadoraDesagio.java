@@ -1,15 +1,14 @@
 package com.srmasset.creditengine.domain;
 
-import ch.obermuhlner.math.big.BigDecimalMath;
-
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.math.RoundingMode;
 
 /**
  * Implementa a formula de desagio definida em SPEC.md ("Premissas adotadas" - item 1):
- * desconto composto por valor presente, com taxa de desconto anual composta por
- * taxaBase(moeda) + spreadRisco(categoria) + custoOperacional, e base de dias por moeda.
+ * desconto composto por valor presente, com taxa de desconto mensal composta por
+ * taxaBase(moeda) + spreadRisco(categoria) + custoOperacional (todas expressas ao mes),
+ * capitalizada por juros compostos mensais sobre o prazo em meses inteiros.
  *
  * <p>Calculos intermediarios usam MathContext de alta precisao para nao perder informacao
  * antes do arredondamento final; o resultado (valorPresente/valorDesagio) e' arredondado
@@ -23,23 +22,19 @@ public class CalculadoraDesagio {
 
     /**
      * @param valorBruto        valor de face do recebivel
-     * @param moeda             moeda do recebivel (define a base de dias)
-     * @param prazoDias         dias corridos ate o vencimento (ver {@link Recebivel#calcularPrazoDias})
-     * @param taxaBase          taxa base de mercado vigente para a moeda (fracao decimal, a.a.)
-     * @param spreadRisco       spread da categoria de risco do recebivel (fracao decimal, a.a.)
-     * @param custoOperacional  spread fixo de custo operacional (fracao decimal, a.a.)
+     * @param prazoMeses        prazo em meses inteiros ate o vencimento (ver {@link Recebivel#calcularPrazoMeses})
+     * @param taxaBase          taxa base de mercado vigente para a moeda (fracao decimal, a.m.)
+     * @param spreadRisco       spread da categoria de risco do recebivel (fracao decimal, a.m.)
+     * @param custoOperacional  spread fixo de custo operacional (fracao decimal, a.m.)
      */
-    public ResultadoDesagio calcular(BigDecimal valorBruto, Moeda moeda, long prazoDias,
+    public ResultadoDesagio calcular(BigDecimal valorBruto, long prazoMeses,
                                       BigDecimal taxaBase, BigDecimal spreadRisco, BigDecimal custoOperacional) {
         BigDecimal taxaDesconto = taxaBase
                 .add(spreadRisco, CONTEXTO_CALCULO)
                 .add(custoOperacional, CONTEXTO_CALCULO);
 
-        BigDecimal expoente = BigDecimal.valueOf(prazoDias)
-                .divide(BigDecimal.valueOf(moeda.baseDias()), CONTEXTO_CALCULO);
-
         BigDecimal baseComposta = BigDecimal.ONE.add(taxaDesconto, CONTEXTO_CALCULO);
-        BigDecimal fatorDesconto = BigDecimalMath.pow(baseComposta, expoente, CONTEXTO_CALCULO);
+        BigDecimal fatorDesconto = baseComposta.pow(Math.toIntExact(prazoMeses), CONTEXTO_CALCULO);
 
         BigDecimal valorPresente = valorBruto
                 .divide(fatorDesconto, CONTEXTO_CALCULO)

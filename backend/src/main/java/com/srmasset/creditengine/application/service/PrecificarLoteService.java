@@ -91,11 +91,11 @@ public class PrecificarLoteService implements PrecificarLoteUseCase {
 
     private void precificarItem(Recebivel recebivel, LocalDate dataReferencia) {
         try {
-            long prazoDias = recebivel.calcularPrazoDias(dataReferencia);
+            long prazoMeses = recebivel.calcularPrazoMeses(dataReferencia);
             BigDecimal taxaBase = taxaBaseRepository.buscarTaxaVigente(recebivel.getMoeda());
             BigDecimal spreadRisco = categoriaRiscoRepository.buscarSpread(recebivel.getCategoriaRisco());
             ResultadoDesagio resultado = calculadora.calcular(
-                    recebivel.getValorBruto(), recebivel.getMoeda(), prazoDias,
+                    recebivel.getValorBruto(), prazoMeses,
                     taxaBase, spreadRisco, custoOperacionalPadrao);
             recebivel.aplicarPrecificacao(resultado);
         } catch (PrazoInvalidoException e) {

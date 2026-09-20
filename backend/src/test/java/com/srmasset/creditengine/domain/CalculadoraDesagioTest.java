@@ -11,9 +11,9 @@ class CalculadoraDesagioTest {
     private final CalculadoraDesagio calculadora = new CalculadoraDesagio();
 
     @Test
-    void quandoPrazoIgualABaseDeDias_fatorDescontoEhExatamenteUmMaisTaxa() {
-        // BRL: base 252 dias. Com prazo == baseDias, o expoente e' 1, tornando o
-        // resultado verificavel manualmente: valorPresente = valorBruto / (1 + taxa).
+    void quandoPrazoEhUmMes_fatorDescontoEhExatamenteUmMaisTaxa() {
+        // Com prazoMeses == 1, o expoente e' 1, tornando o resultado verificavel
+        // manualmente: valorPresente = valorBruto / (1 + taxa).
         BigDecimal valorBruto = new BigDecimal("10000.00");
         BigDecimal taxaBase = new BigDecimal("0.05");
         BigDecimal spreadRisco = new BigDecimal("0.03");
@@ -21,7 +21,7 @@ class CalculadoraDesagioTest {
         // taxaDesconto total = 0.10
 
         ResultadoDesagio resultado = calculadora.calcular(
-                valorBruto, Moeda.BRL, 252, taxaBase, spreadRisco, custoOperacional);
+                valorBruto, 1, taxaBase, spreadRisco, custoOperacional);
 
         BigDecimal valorPresenteEsperado = valorBruto.divide(new BigDecimal("1.10"), 2, java.math.RoundingMode.HALF_EVEN);
         assertThat(resultado.valorPresente()).isEqualByComparingTo(valorPresenteEsperado);
@@ -30,17 +30,18 @@ class CalculadoraDesagioTest {
     }
 
     @Test
-    void quandoPrazoIgualABaseDeDias_USD_usaBase360() {
+    void quandoPrazoEhDoisMeses_fatorDescontoEhTaxaAoQuadrado() {
         BigDecimal valorBruto = new BigDecimal("5000.00");
         BigDecimal taxaBase = new BigDecimal("0.048");
         BigDecimal spreadRisco = new BigDecimal("0.02");
         BigDecimal custoOperacional = new BigDecimal("0.005");
-        // taxaDesconto total = 0.073
+        // taxaDesconto total = 0.073, capitalizada por 2 meses: (1.073)^2
 
         ResultadoDesagio resultado = calculadora.calcular(
-                valorBruto, Moeda.USD, 360, taxaBase, spreadRisco, custoOperacional);
+                valorBruto, 2, taxaBase, spreadRisco, custoOperacional);
 
-        BigDecimal valorPresenteEsperado = valorBruto.divide(new BigDecimal("1.073"), 2, java.math.RoundingMode.HALF_EVEN);
+        BigDecimal fatorEsperado = new BigDecimal("1.073").multiply(new BigDecimal("1.073"));
+        BigDecimal valorPresenteEsperado = valorBruto.divide(fatorEsperado, 2, java.math.RoundingMode.HALF_EVEN);
         assertThat(resultado.valorPresente()).isEqualByComparingTo(valorPresenteEsperado);
     }
 
@@ -49,8 +50,8 @@ class CalculadoraDesagioTest {
         BigDecimal valorBruto = new BigDecimal("12345.67");
 
         ResultadoDesagio resultado = calculadora.calcular(
-                valorBruto, Moeda.BRL, 47, new BigDecimal("0.1065"),
-                new BigDecimal("0.035"), new BigDecimal("0.005"));
+                valorBruto, 3, new BigDecimal("0.008469"),
+                new BigDecimal("0.002871"), new BigDecimal("0.000416"));
 
         assertThat(resultado.valorPresente().add(resultado.valorDesagio()))
                 .isEqualByComparingTo(valorBruto);
@@ -63,8 +64,8 @@ class CalculadoraDesagioTest {
         BigDecimal spreadRisco = BigDecimal.ZERO;
         BigDecimal custoOperacional = BigDecimal.ZERO;
 
-        ResultadoDesagio prazoCurto = calculadora.calcular(valorBruto, Moeda.BRL, 30, taxaBase, spreadRisco, custoOperacional);
-        ResultadoDesagio prazoLongo = calculadora.calcular(valorBruto, Moeda.BRL, 180, taxaBase, spreadRisco, custoOperacional);
+        ResultadoDesagio prazoCurto = calculadora.calcular(valorBruto, 1, taxaBase, spreadRisco, custoOperacional);
+        ResultadoDesagio prazoLongo = calculadora.calcular(valorBruto, 6, taxaBase, spreadRisco, custoOperacional);
 
         assertThat(prazoLongo.valorDesagio()).isGreaterThan(prazoCurto.valorDesagio());
         assertThat(prazoLongo.valorPresente()).isLessThan(prazoCurto.valorPresente());
@@ -73,8 +74,8 @@ class CalculadoraDesagioTest {
     @Test
     void resultadosSaoArredondadosComEscalaMonetariaDeDuasCasas() {
         ResultadoDesagio resultado = calculadora.calcular(
-                new BigDecimal("999.99"), Moeda.BRL, 15, new BigDecimal("0.1065"),
-                new BigDecimal("0.055"), new BigDecimal("0.005"));
+                new BigDecimal("999.99"), 1, new BigDecimal("0.008469"),
+                new BigDecimal("0.004472"), new BigDecimal("0.000416"));
 
         assertThat(resultado.valorPresente().scale()).isEqualTo(2);
         assertThat(resultado.valorDesagio().scale()).isEqualTo(2);

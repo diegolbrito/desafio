@@ -40,13 +40,24 @@ class RecebivelTest {
     }
 
     @Test
-    void calculaPrazoDiasCorretamente() {
+    void calculaPrazoMesesCorretamenteQuandoExatoEmMesesInteiros() {
         Recebivel recebivel = Recebivel.criar("Cedente", new BigDecimal("100.00"), Moeda.BRL,
                 LocalDate.of(2026, 10, 20), CategoriaRisco.A);
 
-        long prazo = recebivel.calcularPrazoDias(LocalDate.of(2026, 9, 20));
+        long prazo = recebivel.calcularPrazoMeses(LocalDate.of(2026, 9, 20));
 
-        assertThat(prazo).isEqualTo(30);
+        assertThat(prazo).isEqualTo(1);
+    }
+
+    @Test
+    void arredondaMesIncompletoParaCimaComoMesInteiro() {
+        Recebivel recebivel = Recebivel.criar("Cedente", new BigDecimal("100.00"), Moeda.BRL,
+                LocalDate.of(2026, 11, 5), CategoriaRisco.A);
+
+        // 1 mes completo (20/09 -> 20/10) + fracao de mes (20/10 -> 05/11) = arredonda para 2
+        long prazo = recebivel.calcularPrazoMeses(LocalDate.of(2026, 9, 20));
+
+        assertThat(prazo).isEqualTo(2);
     }
 
     @Test
@@ -54,9 +65,9 @@ class RecebivelTest {
         Recebivel recebivel = Recebivel.criar("Cedente", new BigDecimal("100.00"), Moeda.BRL,
                 LocalDate.of(2026, 9, 20), CategoriaRisco.A);
 
-        assertThatThrownBy(() -> recebivel.calcularPrazoDias(LocalDate.of(2026, 9, 20)))
+        assertThatThrownBy(() -> recebivel.calcularPrazoMeses(LocalDate.of(2026, 9, 20)))
                 .isInstanceOf(PrazoInvalidoException.class);
-        assertThatThrownBy(() -> recebivel.calcularPrazoDias(LocalDate.of(2026, 9, 21)))
+        assertThatThrownBy(() -> recebivel.calcularPrazoMeses(LocalDate.of(2026, 9, 21)))
                 .isInstanceOf(PrazoInvalidoException.class);
     }
 
