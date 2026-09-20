@@ -6,10 +6,10 @@ export function LoteDetalhePage() {
   const { id } = useParams<{ id: string }>()
 
   return (
-    <main>
-      <p>
-        <Link to="/">{TEXTOS.detalhe.voltar}</Link>
-      </p>
+    <main className="mx-auto max-w-5xl space-y-4 px-4 py-8">
+      <Link to="/" className="text-sm text-primary underline-offset-4 hover:underline">
+        {TEXTOS.detalhe.voltar}
+      </Link>
       {id && <LoteRecebiveisDetalhe id={id} />}
     </main>
   )

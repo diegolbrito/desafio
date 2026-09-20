@@ -24,7 +24,7 @@ export const router = createBrowserRouter([
     path: '/',
     errorElement: <RotaErro />,
     element: (
-      <Suspense fallback={<p>Carregando...</p>}>
+      <Suspense fallback={<p className="mx-auto max-w-5xl px-4 py-8 text-muted-foreground">Carregando...</p>}>
         <LotesRecebiveisPage />
       </Suspense>
     ),
@@ -33,7 +33,7 @@ export const router = createBrowserRouter([
     path: '/lotes-recebiveis/:id',
     errorElement: <RotaErro />,
     element: (
-      <Suspense fallback={<p>Carregando...</p>}>
+      <Suspense fallback={<p className="mx-auto max-w-5xl px-4 py-8 text-muted-foreground">Carregando...</p>}>
         <LoteDetalhePage />
       </Suspense>
     ),

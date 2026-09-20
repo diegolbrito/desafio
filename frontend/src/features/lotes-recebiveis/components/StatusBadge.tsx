@@ -1,14 +1,15 @@
+import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
 import { TEXTOS } from '../constants/textos'
-import styles from './StatusBadge.module.css'
 
 type Status = keyof typeof TEXTOS.status
 
-const TOM_POR_STATUS: Record<Status, 'sucesso' | 'erro' | 'neutro'> = {
-  RECEBIDO: 'neutro',
-  PRECIFICADO: 'sucesso',
-  ERRO: 'erro',
-  PENDENTE: 'neutro',
-  REJEITADO: 'erro',
+const CLASSES_POR_STATUS: Record<Status, string> = {
+  RECEBIDO: '',
+  PRECIFICADO: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200',
+  ERRO: '',
+  PENDENTE: '',
+  REJEITADO: '',
 }
 
 interface StatusBadgeProps {
@@ -17,10 +18,15 @@ interface StatusBadgeProps {
 
 export function StatusBadge({ status }: StatusBadgeProps) {
   if (!status || !(status in TEXTOS.status)) {
-    return <span className={styles.badge}>{status ?? '—'}</span>
+    return <Badge variant="secondary">{status ?? '—'}</Badge>
   }
 
   const statusConhecido = status as Status
-  const tom = TOM_POR_STATUS[statusConhecido]
-  return <span className={`${styles.badge} ${styles[tom]}`}>{TEXTOS.status[statusConhecido]}</span>
+  const variant = statusConhecido === 'ERRO' || statusConhecido === 'REJEITADO' ? 'destructive' : 'secondary'
+
+  return (
+    <Badge variant={variant} className={cn(CLASSES_POR_STATUS[statusConhecido])}>
+      {TEXTOS.status[statusConhecido]}
+    </Badge>
+  )
 }
