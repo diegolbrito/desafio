@@ -749,3 +749,37 @@ commit/PR/release, mesmo fluxo já usado nas features anteriores.
     sem esse fix, essa mesma sequência reproduz o erro relatado pelo usuário.
   - Escopo do fix: só `frontend/nginx.conf`. Nenhum código de aplicação (backend ou frontend)
     mudou; não afeta `mvn test`/`npm test`.
+- **Pipeline de CI via GitHub Actions (`.github/workflows/ci.yml`), sem CD** — pedido do usuário,
+  que também pediu explicitamente um plano por escrito antes de qualquer commit (via `/plan`).
+  3 (depois 4) jobs: `backend` (`mvn test`, JDK 25 Temurin nativo no runner — sem o wrapping em
+  container Maven necessário localmente, já que o runner Linux do GitHub Actions tem Docker
+  nativo para o Testcontainers, sem as gambiarras de Docker Desktop/Windows documentadas acima),
+  `frontend` (`npm ci` + lint + test + build, Node 22 nativo), e build das imagens Docker
+  (`docker/build-push-action`, sempre `push: false` — só valida que os `Dockerfile`s continuam
+  funcionando). Badge de status adicionado no README.
+  - **Validado antes de commitar rodando os mesmos comandos localmente**: `mvn test` (71/71) e,
+    para o frontend, copiando os arquivos pro filesystem nativo do container (sem bind-mount) pra
+    representar fielmente o ambiente do runner — lint limpo, 26/26 testes, build OK. Essa cópia
+    also serviu pra confirmar uma suspeita: rodar `npm test` direto via bind-mount no Windows local
+    (sem copiar antes) falhou de forma **flaky e não-determinística** ("Failed to start threads
+    worker", um arquivo de teste diferente falhando a cada tentativa) — exatamente o problema de
+    bind-mount cross-OS já documentado nesta sessão (Etapa 6), não uma regressão nova. Confirmação
+    útil: o CI real (checkout nativo no runner, sem bind-mount) não sofre disso.
+  - **Dois problemas reais só apareceram na primeira execução de verdade no GitHub Actions** (não
+    detectáveis localmente, já que não há como rodar Actions localmente sem ferramentas extras):
+    1. `docker-build` (backend+frontend na mesma máquina) falhou com `failed to reserve cache`
+       (disco do runner esgotado) — `cache-to: mode=max` guarda até os estágios intermediários do
+       build multi-stage (todo o repositório Maven baixado incluído). Corrigido separando em dois
+       jobs (`docker-build-backend`, `docker-build-frontend`, cada um com disco próprio) e trocando
+       para `mode=min` (só as camadas finais).
+    2. Mesmo depois desse fix, os jobs de build de imagem apareceram como **cancelados** (não
+       falhos) numa segunda tentativa. Causa: o grupo de `concurrency` (`ci-${{ github.workflow }}-
+       ${{ github.ref }}`) colidiu entre a execução de `push` na `main` e uma execução de
+       `pull_request` disparada **tardiamente** pelo GitHub logo após o merge da própria PR (o
+       `pull_request` run aparece minutos depois do merge, não junto com a abertura da PR) — as
+       duas acabaram competindo pelo mesmo `github.ref` em algum momento e uma cancelou a outra.
+       Corrigido trocando a chave do grupo para `github.event.pull_request.number || github.ref`,
+       que nunca colide entre os dois tipos de evento.
+  - Cada correção foi commitada, aberta como PR, mergeada, e a execução real na `main` foi
+    acompanhada via `gh run watch` até confirmar os 4 jobs verdes antes de seguir adiante — só
+    então a release foi gerada, evitando publicar uma release com o CI comprovadamente quebrado.
