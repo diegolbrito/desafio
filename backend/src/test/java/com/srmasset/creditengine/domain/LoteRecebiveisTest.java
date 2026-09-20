@@ -13,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class LoteRecebiveisTest {
 
     private Recebivel recebivel() {
-        return Recebivel.criar("Cedente Ltda", new BigDecimal("1000.00"), Moeda.BRL,
+        return Recebivel.criar("Ativo Ltda", new BigDecimal("1000.00"),
                 LocalDate.of(2026, 12, 31), CategoriaRisco.B);
     }
 

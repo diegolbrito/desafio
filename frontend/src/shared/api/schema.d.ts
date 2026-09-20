@@ -53,15 +53,18 @@ export interface components {
             recebiveis: components["schemas"]["RecebivelRequest"][];
         };
         RecebivelRequest: {
-            cedente: string;
+            ativo: string;
             /** @example 15000.00 */
             valorBruto: string;
-            /** @enum {string} */
-            moeda: "BRL" | "USD";
             /** Format: date */
             dataVencimento: string;
             /** @enum {string} */
             categoriaRisco: "AA" | "A" | "B" | "C" | "D" | "E";
+            /**
+             * @description Moeda em que o recebivel e' efetivamente pago, se diferente de BRL (cross-currency). Omitir quando o pagamento e' em BRL (mesma moeda do ativo).
+             * @enum {string}
+             */
+            moedaPagamento?: "BRL" | "USD";
         };
         LoteRecebiveisResponse: {
             /** Format: uuid */
@@ -75,7 +78,7 @@ export interface components {
         RecebivelResponse: {
             /** Format: uuid */
             id?: string;
-            cedente?: string;
+            ativo?: string;
             /** @example 15000.00 */
             valorBruto?: string;
             /** @enum {string} */
@@ -93,6 +96,16 @@ export interface components {
             /** @example 0.146500 */
             taxaDescontoAplicada?: string;
             motivoRejeicao?: string;
+            /**
+             * @description Moeda em que o recebivel e' efetivamente pago; igual a `moeda` quando nao ha conversao cambial.
+             * @enum {string}
+             */
+            moedaPagamento?: "BRL" | "USD";
+            /**
+             * @description Cotacao (BRL por 1 USD) usada na conversao; null quando moedaPagamento == moeda.
+             * @example 5.20
+             */
+            cotacaoCambio?: string;
         };
         LoteRecebiveisResumoResponse: {
             /** Format: uuid */

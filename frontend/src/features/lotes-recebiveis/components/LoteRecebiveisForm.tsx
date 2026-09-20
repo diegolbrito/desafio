@@ -47,6 +47,7 @@ export function LoteRecebiveisForm() {
   return (
     <form onSubmit={handleSubmit(onSubmit)} aria-labelledby="titulo-novo-lote" noValidate>
       <h2 id="titulo-novo-lote">{TEXTOS.form.tituloSecao}</h2>
+      <p>{TEXTOS.form.subtituloSecao}</p>
 
       {fields.map((field, index) => (
         <fieldset key={field.id} className={styles.recebivel}>
@@ -56,9 +57,9 @@ export function LoteRecebiveisForm() {
 
           <div className={styles.grid}>
             <TextField
-              label={TEXTOS.form.cedente}
-              error={errors.recebiveis?.[index]?.cedente?.message}
-              {...register(`recebiveis.${index}.cedente`)}
+              label={TEXTOS.form.ativo}
+              error={errors.recebiveis?.[index]?.ativo?.message}
+              {...register(`recebiveis.${index}.ativo`)}
             />
             <TextField
               label={TEXTOS.form.valorBruto}
@@ -68,9 +69,9 @@ export function LoteRecebiveisForm() {
               {...register(`recebiveis.${index}.valorBruto`)}
             />
             <Select
-              label={TEXTOS.form.moeda}
-              error={errors.recebiveis?.[index]?.moeda?.message}
-              {...register(`recebiveis.${index}.moeda`)}
+              label={TEXTOS.form.moedaPagamento}
+              error={errors.recebiveis?.[index]?.moedaPagamento?.message}
+              {...register(`recebiveis.${index}.moedaPagamento`)}
             >
               <option value="BRL">{TEXTOS.moedas.BRL}</option>
               <option value="USD">{TEXTOS.moedas.USD}</option>

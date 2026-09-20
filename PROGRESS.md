@@ -439,3 +439,88 @@ critério do usuário (ex.: revisão geral, ajustes de UX, deploy real).
     cenário cross-currency em `PrecificarLoteServiceTest` (agora configurando
     `cotacaoCambioPadrao` no construtor do service em vez de no comando) e round-trip de
     persistência em `PersistenciaIntegrationTest`.
+- **Bug real encontrado e corrigido: `deságio` estava sendo convertido junto com `valorPresente`
+  no cross-currency, quando só o `valorPresente` deveria ser.** O usuário reportou "o câmbio não
+  está sendo usado quando a moeda é USD"; testes manuais mostraram que a conversão de fato
+  acontecia nos dois sentidos (BRL→USD e USD→BRL) e o valor persistido no banco batia com o
+  calculado — o sistema não tinha bug de aplicação de câmbio. O problema real só apareceu quando
+  o usuário forneceu 3 casos de aferição de negócio (título BRL 100.000,00/3 meses, comparando
+  pago em BRL vs. pago em USD a 5,4321): o `deságio` esperado é **idêntico** nos dois casos
+  (R$ 7.140,06), só o `valorPresente` muda (R$ 92.859,94 → US$ 17.094,67). Ou seja, `deságio`
+  nunca deveria ser convertido — ele representa o custo do desconto no referencial do próprio
+  título, não um valor a pagar. Corrigido em `ConversorCambial.converter` (parou de calcular
+  `valorBrutoConvertido`/derivar `valorDesagioConvertido` por subtração, agora só converte
+  `valorPresente` e devolve o `valorDesagio` original inalterado); `PrecificarLoteService`
+  ajustado (não passa mais `valorBruto` para o conversor). **Consequência documentada em
+  SPEC.md**: o invariante `valorPresente + deságio == valorBruto` só vale sem cross-currency —
+  com conversão, os três ficam em moedas potencialmente diferentes e a soma direta não faz
+  sentido. Os 3 casos de aferição viraram teste permanente (`CasosAfericaoTest`), e
+  `ConversorCambialTest`/`PrecificarLoteServiceTest` foram ajustados para a nova regra.
+  **Causa do "bug fantasma" nos testes manuais anteriores**: o container Docker Compose não
+  tinha sido recriado após um `docker compose up -d --build` (o Compose não recria um container
+  já "up" só porque a imagem mudou, sem `--force-recreate` ou remoção prévia) — os testes
+  manuais rodavam contra uma imagem antiga do backend, mascarando por um tempo qual comportamento
+  estava realmente em vigor. Lição: após rebuild de imagem, usar `--force-recreate` (ou `down` +
+  `up`) para garantir que o container em execução reflete o código atual.
+- **Coleção Bruno revisada e completada**: adicionado request "Criar lote (erro de validacao)"
+  (faltava um exemplo de 400/RFC 9457 por validação estrutural — só havia sucesso, rejeição por
+  regra de negócio e cross-currency). Ao revisar, percebi que "Criar lote" tinha sido editado
+  (fora desta sessão) para usar os mesmos dados dos 3 casos de aferição do negócio
+  ("Duplicata Mercantil"/"Cheque Pré-datado"), e que os valores batiam certinho — mas só porque
+  `categoria_risco.AA`/`categoria_risco.C` e `taxa_base` (ambas moedas) tinham sido ajustados
+  **manualmente no banco deste ambiente**, fora de qualquer migration. Criada
+  `V202609181007__fixar_taxas_dos_casos_de_afericao.sql` para versionar esse estado (taxa base
+  1% a.m. fixa para BRL/USD, `AA=0,015000`, `C=0,025000`), garantindo que os casos de aferição
+  continuem batendo depois de um `docker compose down -v`. `SPEC.md` (itens 2 e 3) e
+  `PersistenciaIntegrationTest` (asserts de seed) atualizados para os novos valores.
+- **Campo `cedente` renomeado para `ativo`** (pedido do usuário: "faz mais sentido"), em toda a
+  cadeia — banco (nova migration `V202609181008__renomear_cedente_para_ativo.sql`, `alter table
+  ... rename column`, nunca editar a migration original já aplicada), domínio (`Recebivel`),
+  persistência (`RecebivelEntity`), DTOs (`RecebivelRequest`/`RecebivelResponse`/
+  `RecebivelLeitura`/`ComandoPrecificarLote.ComandoRecebivel`), frontend (schema Zod, formulário,
+  tela de detalhe, textos centralizados em `TEXTOS`), testes (backend e frontend) e coleção
+  Bruno. `SPEC.md` atualizado (item 7 renomeado para "Cadastro do ativo", com nota explicando a
+  motivação: o campo vinha sendo preenchido com o tipo do instrumento — "Duplicata Mercantil",
+  "Cheque Pré-datado" — não o nome de uma empresa cedente); mantidas as referências ao conceito
+  de negócio "cedente" (a empresa que cede o recebível ao fundo) onde o texto fala do modelo de
+  negócio do FIDC em si, não do nome do campo.
+  - Aproveitado o rename para regenerar `openapi.yaml` direto do backend rodando
+    (`/v3/api-docs.yaml`) em vez de editar manualmente o arquivo estático desatualizado — o que
+    também trouxe `moedaPagamento`/`cotacaoCambio` para o spec e para `frontend/src/shared/api/
+    schema.d.ts` (via `npm run generate:api-types`), lacuna que vinha da feature de câmbio e
+    ainda não tinha sido fechada.
+  - **Workaround do Vitest+bind-mount (Etapa 6) piorou**: com `frontend/node_modules` já instalado
+    localmente (239 MB), o `cp -r /appmnt /native` (copiar bind mount inteiro para o filesystem
+    nativo do container antes de testar) ficou tão lento que parecia travado (processo em estado
+    `D`/uninterruptible sleep por 6+ minutos copiando arquivos pequenos via bind mount cross-OS).
+    Resolvido montando o bind mount como `:ro` e copiando só `src/`, `package.json`,
+    `package-lock.json`, `tsconfig.json`, `vite.config.ts`, `index.html` (sem `node_modules`) —
+    `npm install` reinstala as dependências dentro do container nativo, o que é rápido. Vale
+    lembrar dessa diferença: copiar a pasta toda só é rápido enquanto `node_modules` não existir
+    localmente.
+- **Ativo passou a ser sempre denominado em BRL** (pedido do usuário): não existe mais campo
+  `moeda` na entrada do recebível — quem cria o lote só escolhe `moedaPagamento` (opcional; ausente
+  = pago na própria moeda do ativo, BRL). Reverte a flexibilidade original do modelo (ativo podia
+  ser BRL ou USD) por uma regra de negócio mais simples: o fundo sempre origina o ativo em reais,
+  só a moeda de pagamento varia.
+  - `Recebivel.criar` perdeu o parâmetro `moeda`; `Moeda.BRL` é atribuída internamente, sempre, no
+    construtor privado — deixou de ser um dado de entrada.
+  - `ConversorCambial` simplificado: como o ativo é sempre BRL, a única conversão possível é
+    BRL → moeda de pagamento (nunca o contrário) — removido o parâmetro `moedaTitulo` e a lógica
+    de decidir a direção (`converterValor` não precisa mais de ternário).
+  - `RecebivelRequest`/`ComandoPrecificarLote.ComandoRecebivel` perderam o campo `moeda`.
+    `RecebivelResponse`/`RecebivelEntity`/`RecebivelLeitura` mantiveram o campo (sempre retorna
+    `"BRL"`) — é informação útil na leitura, só deixou de ser aceito na escrita.
+  - **Sem migration de schema**: a coluna `moeda` no banco continua exatamente como estava (not
+    null, char(3)) — só a aplicação parou de gravar qualquer valor além de `BRL` nela. Linhas
+    antigas com `moeda = 'USD'` (de testes anteriores a esta decisão) não foram reescritas —
+    ver SPEC.md item 3 para a justificativa (não reescrever histórico de auditoria).
+  - Teste ajustado: `marcaLoteComErroQuandoTaxaBaseNaoEncontrada` usava `Moeda.USD` como moeda do
+    recebível para simular referência ausente; como isso não é mais possível via API, o cenário
+    passou a mockar a ausência da própria taxa base de BRL.
+  - Frontend: campo "Moeda" do formulário virou "Moeda de pagamento" (`moedaPagamento` no schema
+    Zod), com subtítulo explicando a regra. Label de "Valor bruto" ganhou "(R$)" para reforçar
+    que é sempre em reais. Tela de detalhe corrigida para formatar `valorPresente` na
+    `moedaPagamento` (não mais na `moeda` do ativo) — esse era, na prática, um bug de exibição
+    pré-existente da feature de câmbio (nunca tinha sido corrigido). `openapi.yaml`/`schema.d.ts`
+    regenerados do backend real de novo.

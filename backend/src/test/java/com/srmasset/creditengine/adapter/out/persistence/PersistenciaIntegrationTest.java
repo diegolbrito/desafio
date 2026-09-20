@@ -67,19 +67,19 @@ class PersistenciaIntegrationTest {
 
     @Test
     void seedsDeTaxaBaseEstaoDisponiveis() {
-        assertThat(taxaBaseAdapter.buscarTaxaVigente(Moeda.BRL)).isEqualByComparingTo("0.008469");
-        assertThat(taxaBaseAdapter.buscarTaxaVigente(Moeda.USD)).isEqualByComparingTo("0.003915");
+        assertThat(taxaBaseAdapter.buscarTaxaVigente(Moeda.BRL)).isEqualByComparingTo("0.010000");
+        assertThat(taxaBaseAdapter.buscarTaxaVigente(Moeda.USD)).isEqualByComparingTo("0.010000");
     }
 
     @Test
     void seedsDeCategoriaRiscoEstaoDisponiveis() {
-        assertThat(categoriaRiscoAdapter.buscarSpread(CategoriaRisco.AA)).isEqualByComparingTo("0.000830");
+        assertThat(categoriaRiscoAdapter.buscarSpread(CategoriaRisco.AA)).isEqualByComparingTo("0.015000");
         assertThat(categoriaRiscoAdapter.buscarSpread(CategoriaRisco.E)).isEqualByComparingTo("0.009489");
     }
 
     @Test
     void salvaLoteComRecebiveisEAtribuiIds() {
-        Recebivel recebivel = Recebivel.criar("Cedente Teste", new BigDecimal("1000.00"), Moeda.BRL,
+        Recebivel recebivel = Recebivel.criar("Ativo Teste", new BigDecimal("1000.00"),
                 LocalDate.now().plusDays(30), CategoriaRisco.B);
         recebivel.aplicarPrecificacao(new ResultadoDesagio(
                 new BigDecimal("950.00"), new BigDecimal("50.00"), new BigDecimal("0.105000")));
@@ -96,7 +96,7 @@ class PersistenciaIntegrationTest {
 
     @Test
     void salvaRecebivelCrossCurrencyComMoedaPagamentoECotacao() {
-        Recebivel recebivel = Recebivel.criar("Cedente Teste", new BigDecimal("1000.00"), Moeda.BRL,
+        Recebivel recebivel = Recebivel.criar("Ativo Teste", new BigDecimal("1000.00"),
                 LocalDate.now().plusDays(30), CategoriaRisco.B, Moeda.USD);
         recebivel.aplicarPrecificacao(new ResultadoDesagio(
                 new BigDecimal("182.69"), new BigDecimal("9.62"), new BigDecimal("0.105000")), new BigDecimal("5.20"));
@@ -107,13 +107,14 @@ class PersistenciaIntegrationTest {
 
         var recebivelPersistido = loteRepository.buscarComRecebiveisPorId(lote.getId())
                 .orElseThrow().getRecebiveis().get(0);
+        assertThat(recebivelPersistido.getMoeda()).isEqualTo(Moeda.BRL);
         assertThat(recebivelPersistido.getMoedaPagamento()).isEqualTo(Moeda.USD);
         assertThat(recebivelPersistido.getCotacaoCambio()).isEqualByComparingTo("5.20");
     }
 
     @Test
     void registraEventoDeTransacaoReferenciandoLotePersistido() {
-        Recebivel recebivel = Recebivel.criar("Cedente Teste", new BigDecimal("1000.00"), Moeda.BRL,
+        Recebivel recebivel = Recebivel.criar("Ativo Teste", new BigDecimal("1000.00"),
                 LocalDate.now().plusDays(30), CategoriaRisco.B);
         LoteRecebiveis lote = LoteRecebiveis.criar(LocalDate.now(), List.of(recebivel));
         LoteRecebiveis salvo = loteAdapter.salvar(lote);
@@ -135,8 +136,8 @@ class PersistenciaIntegrationTest {
                 new BigDecimal("0.005"), new BigDecimal("5.20"), Clock.systemUTC());
 
         ComandoPrecificarLote comando = new ComandoPrecificarLote(List.of(
-                new ComandoPrecificarLote.ComandoRecebivel("Cedente Integracao", new BigDecimal("5000.00"),
-                        Moeda.BRL, LocalDate.now().plusDays(60), CategoriaRisco.C, null)
+                new ComandoPrecificarLote.ComandoRecebivel("Ativo Integracao", new BigDecimal("5000.00"),
+                        LocalDate.now().plusDays(60), CategoriaRisco.C, null)
         ));
 
         LoteRecebiveis lote = service.precificar(comando);
