@@ -25,8 +25,9 @@ import java.time.LocalDate;
  * <p>O ativo e' sempre denominado em BRL (ver SPEC.md, "Premissas adotadas" item 3) - por isso
  * nao ha campo {@code moeda} aqui, so' {@code moedaPagamento}. {@code moedaPagamento} e'
  * opcional: quando omitido (ou igual a BRL), nao ha conversao cambial. Quando diferente de BRL
- * (cross-currency), a cotacao usada na conversao NAO e' recebida aqui - vem de configuracao da
- * aplicacao ({@code credit-engine.cotacao-cambio}), mesmo padrao de {@code custoOperacional}.
+ * (cross-currency), a cotacao usada na conversao NAO e' recebida aqui - e' buscada pelo backend
+ * num servico HTTP externo (ver SPEC.md "Premissas adotadas" item 11; com fallback para a ultima
+ * cotacao conhecida ou um valor estatico de seguranca se esse servico estiver fora do ar).
  */
 public record RecebivelRequest(
         @NotBlank(message = "Ativo e obrigatorio") String ativo,

@@ -5,6 +5,7 @@ import com.srmasset.creditengine.adapter.out.persistence.repository.LoteRecebive
 import com.srmasset.creditengine.adapter.out.persistence.repository.TransacaoEventoJpaRepository;
 import com.srmasset.creditengine.application.metrics.CreditEngineMetrics;
 import com.srmasset.creditengine.application.port.in.ComandoPrecificarLote;
+import com.srmasset.creditengine.application.port.out.CotacaoCambioPort;
 import com.srmasset.creditengine.application.service.PrecificarLoteService;
 import com.srmasset.creditengine.domain.CategoriaRisco;
 import com.srmasset.creditengine.domain.EventoTransacao;
@@ -139,9 +140,13 @@ class PersistenciaIntegrationTest {
 
     @Test
     void precificaLoteCompletoUsandoAdaptersReais() {
+        // lote 100% BRL (moedaPagamento null) - nunca deveria chamar o servico de cambio
+        CotacaoCambioPort cotacaoCambioPort = () -> {
+            throw new UnsupportedOperationException("lote sem cross-currency nao deveria buscar cotacao");
+        };
         PrecificarLoteService service = new PrecificarLoteService(
-                taxaBaseAdapter, categoriaRiscoAdapter, loteAdapter, eventoAdapter,
-                new BigDecimal("0.005"), new BigDecimal("5.20"), Clock.systemUTC(),
+                taxaBaseAdapter, categoriaRiscoAdapter, loteAdapter, eventoAdapter, cotacaoCambioPort,
+                new BigDecimal("0.005"), Clock.systemUTC(),
                 new CreditEngineMetrics(new SimpleMeterRegistry()));
 
         ComandoPrecificarLote comando = new ComandoPrecificarLote(List.of(

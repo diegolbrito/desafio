@@ -58,6 +58,27 @@ docker compose down -v    # idem, mas também apaga o volume do banco (reset tot
 | Health check | http://localhost:8080/actuator/health |
 | Prometheus | http://localhost:9090 |
 | Grafana (dashboard "SRM Credit Engine" já provisionado) | http://localhost:3001 |
+| Mock da cotação de câmbio (WireMock) | http://localhost:8089/api/v1/cotacoes/USD-BRL |
+
+## Simular indisponibilidade do serviço de cotação de câmbio
+
+O backend busca a cotação de câmbio (usada só quando `moedaPagamento` difere de BRL) num serviço
+HTTP externo — em desenvolvimento, o mock `cotacao-cambio-mock` (WireMock), que sempre responde
+`5.4321`. Para testar a estratégia de resiliência (ver SPEC.md, item 11):
+
+```bash
+docker compose stop cotacao-cambio-mock   # simula o serviço fora do ar
+# crie um lote cross-currency (moedaPagamento: "USD") - a precificação continua funcionando,
+# usando a última cotação conhecida em cache (ou o valor de fallback estático, se nunca tiver
+# obtido nenhuma cotação com sucesso ainda). Acompanhe pelo log (WARN) ou pela métrica:
+curl -s http://localhost:8080/actuator/prometheus | grep creditengine_cotacao_consultas_total
+
+docker compose start cotacao-cambio-mock  # volta ao normal
+```
+
+Depois de 3 falhas consecutivas, o circuit breaker abre por 30s (ambos configuráveis via
+`COTACAO_CAMBIO_CB_LIMITE_FALHAS`/`COTACAO_CAMBIO_CB_JANELA_SEGUNDOS`) e as chamadas seguintes
+nem tentam a rede — a resposta fica bem mais rápida enquanto o circuito está aberto.
 
 ## Chamando a API (Bruno)
 
@@ -107,7 +128,9 @@ mvn spring-boot:run
 
 Variáveis de ambiente aceitas (todas com default para desenvolvimento local):
 `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `SERVER_PORT`, `CUSTO_OPERACIONAL`,
-`CORS_ALLOWED_ORIGINS`.
+`CORS_ALLOWED_ORIGINS`, `COTACAO_CAMBIO_SERVICE_URL`, `COTACAO_CAMBIO_FALLBACK`,
+`COTACAO_CAMBIO_TIMEOUT_CONEXAO_MS`, `COTACAO_CAMBIO_TIMEOUT_LEITURA_MS`,
+`COTACAO_CAMBIO_CB_LIMITE_FALHAS`, `COTACAO_CAMBIO_CB_JANELA_SEGUNDOS`.
 
 **Frontend**:
 

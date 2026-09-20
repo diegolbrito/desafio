@@ -5,6 +5,7 @@ import com.srmasset.creditengine.application.metrics.CreditEngineMetrics;
 import com.srmasset.creditengine.application.port.in.ComandoPrecificarLote;
 import com.srmasset.creditengine.application.port.in.PrecificarLoteUseCase;
 import com.srmasset.creditengine.application.port.out.CategoriaRiscoRepositoryPort;
+import com.srmasset.creditengine.application.port.out.CotacaoCambioPort;
 import com.srmasset.creditengine.application.port.out.RegistrarEventoTransacaoPort;
 import com.srmasset.creditengine.application.port.out.SalvarLoteRecebiveisPort;
 import com.srmasset.creditengine.application.port.out.TaxaBaseRepositoryPort;
@@ -43,8 +44,8 @@ public class PrecificarLoteService implements PrecificarLoteUseCase {
     private final CategoriaRiscoRepositoryPort categoriaRiscoRepository;
     private final SalvarLoteRecebiveisPort salvarLotePort;
     private final RegistrarEventoTransacaoPort registrarEventoPort;
+    private final CotacaoCambioPort cotacaoCambioPort;
     private final BigDecimal custoOperacionalPadrao;
-    private final BigDecimal cotacaoCambioPadrao;
     private final Clock clock;
     private final CreditEngineMetrics metrics;
 
@@ -52,16 +53,16 @@ public class PrecificarLoteService implements PrecificarLoteUseCase {
                                   CategoriaRiscoRepositoryPort categoriaRiscoRepository,
                                   SalvarLoteRecebiveisPort salvarLotePort,
                                   RegistrarEventoTransacaoPort registrarEventoPort,
+                                  CotacaoCambioPort cotacaoCambioPort,
                                   BigDecimal custoOperacionalPadrao,
-                                  BigDecimal cotacaoCambioPadrao,
                                   Clock clock,
                                   CreditEngineMetrics metrics) {
         this.taxaBaseRepository = taxaBaseRepository;
         this.categoriaRiscoRepository = categoriaRiscoRepository;
         this.salvarLotePort = salvarLotePort;
         this.registrarEventoPort = registrarEventoPort;
+        this.cotacaoCambioPort = cotacaoCambioPort;
         this.custoOperacionalPadrao = custoOperacionalPadrao;
-        this.cotacaoCambioPadrao = cotacaoCambioPadrao;
         this.clock = clock;
         this.metrics = metrics;
     }
@@ -79,10 +80,17 @@ public class PrecificarLoteService implements PrecificarLoteUseCase {
 
         LoteRecebiveis lote = LoteRecebiveis.criar(dataReferencia, recebiveis);
 
+        // Busca a cotacao 1x por lote (nao por item): evita I/O redundante e garante que todo o
+        // lote use o mesmo snapshot, mesmo se o valor mudar no meio do processamento. Lotes sem
+        // nenhum item cross-currency nunca chamam o servico externo (ver SPEC.md item 11).
+        boolean precisaCotacaoCambio = lote.getRecebiveis().stream()
+                .anyMatch(r -> r.getMoedaPagamento() != r.getMoeda());
+        BigDecimal cotacaoCambio = precisaCotacaoCambio ? cotacaoCambioPort.buscarCotacao() : null;
+
         String motivoErro = null;
         try {
             for (Recebivel recebivel : lote.getRecebiveis()) {
-                precificarItem(recebivel, dataReferencia);
+                precificarItem(recebivel, dataReferencia, cotacaoCambio);
             }
             lote.marcarPrecificado();
         } catch (ReferenciaNaoEncontradaException e) {
@@ -100,7 +108,7 @@ public class PrecificarLoteService implements PrecificarLoteUseCase {
         return loteSalvo;
     }
 
-    private void precificarItem(Recebivel recebivel, LocalDate dataReferencia) {
+    private void precificarItem(Recebivel recebivel, LocalDate dataReferencia, BigDecimal cotacaoCambio) {
         try {
             long prazoMeses = recebivel.calcularPrazoMeses(dataReferencia);
             BigDecimal taxaBase = taxaBaseRepository.buscarTaxaVigente(recebivel.getMoeda());
@@ -109,8 +117,8 @@ public class PrecificarLoteService implements PrecificarLoteUseCase {
                     recebivel.getValorBruto(), prazoMeses,
                     taxaBase, spreadRisco, custoOperacionalPadrao);
             boolean crossCurrency = recebivel.getMoedaPagamento() != recebivel.getMoeda();
-            resultado = conversorCambial.converter(resultado, recebivel.getMoedaPagamento(), cotacaoCambioPadrao);
-            recebivel.aplicarPrecificacao(resultado, crossCurrency ? cotacaoCambioPadrao : null);
+            resultado = conversorCambial.converter(resultado, recebivel.getMoedaPagamento(), cotacaoCambio);
+            recebivel.aplicarPrecificacao(resultado, crossCurrency ? cotacaoCambio : null);
         } catch (PrazoInvalidoException e) {
             recebivel.rejeitar(e.getMessage());
             log.debug("Recebivel rejeitado por prazo invalido: motivo={}", e.getMessage());

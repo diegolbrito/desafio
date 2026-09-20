@@ -24,11 +24,21 @@ services:
       DB_NAME: credit_engine
       DB_USER: credit_engine
       DB_PASSWORD: credit_engine
+      COTACAO_CAMBIO_SERVICE_URL: http://cotacao-cambio-mock:8080
     ports:
       - "8080:8080"
     depends_on:
       db:
         condition: service_healthy
+      cotacao-cambio-mock:
+        condition: service_started
+
+  cotacao-cambio-mock:
+    image: wiremock/wiremock:3.9.2
+    volumes:
+      - ./mocks/cotacao-cambio:/home/wiremock:ro
+    ports:
+      - "8089:8080"
 
   frontend:
     build:

@@ -52,9 +52,20 @@ credit-engine:
   custo-operacional: ${CUSTO_OPERACIONAL:0.00}
   # Cotacao de cambio (quantidade de BRL por 1 USD) usada para converter o resultado do
   # desagio quando moedaPagamento difere da moeda do titulo (cross-currency - ver SPEC.md,
-  # "Premissas adotadas" item 3). Mesmo padrao de custo-operacional: parametro de aplicacao,
-  # nao recebido via API, pois nao e' cadastro por recebivel, e' taxa vigente do sistema.
-  cotacao-cambio: ${COTACAO_CAMBIO:5.4321}
+  # "Premissas adotadas" itens 3 e 11). Vem de um servico HTTP externo (nao recebida via
+  # API, nao e' cadastro por recebivel) - "fallback" e' o valor de seguranca usado quando
+  # esse servico esta fora do ar e nunca houve nenhuma cotacao obtida com sucesso ainda.
+  cotacao-cambio:
+    service-url: ${COTACAO_CAMBIO_SERVICE_URL:http://localhost:8089}
+    fallback: ${COTACAO_CAMBIO_FALLBACK:5.4321}
+    timeout-conexao-ms: ${COTACAO_CAMBIO_TIMEOUT_CONEXAO_MS:2000}
+    timeout-leitura-ms: ${COTACAO_CAMBIO_TIMEOUT_LEITURA_MS:3000}
+    circuit-breaker:
+      # Apos N falhas consecutivas, para de tentar a rede por essa janela e vai
+      # direto pro fallback (evita esperar o timeout em toda chamada enquanto o
+      # servico externo esta comprovadamente fora do ar).
+      limite-falhas: ${COTACAO_CAMBIO_CB_LIMITE_FALHAS:3}
+      janela-aberto-segundos: ${COTACAO_CAMBIO_CB_JANELA_SEGUNDOS:30}
   cors:
     # Origens do frontend autorizadas a chamar a API (politica de navegador,
     # nao autenticacao). Lista separada por virgula.

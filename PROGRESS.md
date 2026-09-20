@@ -671,5 +671,81 @@ commit/PR/release, mesmo fluxo já usado nas features anteriores.
     liquidar recebíveis via curl (inclusive confirmando que liquidar 2x seguidas mantém o contador em
     `1.0`), dashboard do Grafana renderizando todos os painéis com dados reais (screenshot via Edge
     headless) depois de gerar tráfego suficiente para os painéis baseados em `rate()`.
-  - **Pendente, por pedido do padrão já estabelecido nesta sessão**: aguardando aprovação do usuário
-    antes de commit/PR/release.
+  - Após aprovação do usuário (incluindo um ajuste posterior no painel de latência, de p95 sozinho
+    para p50+p90+p95 juntos): commit na branch `feature/metricas-micrometer-prometheus-grafana`,
+    PR #18, merge na `main` e release **v0.4.0**.
+- **Cotação de câmbio migrada de valor estático de configuração para um serviço HTTP externo
+  (mock), com estratégia de resiliência** — pedido do usuário, que também pediu explicitamente um
+  plano por escrito (via `/plan`) antes de qualquer implementação. Decisões completas em SPEC.md
+  item 11; resumo técnico aqui:
+  - Novo port `CotacaoCambioPort` (aplicação) + adapter `CotacaoCambioHttpAdapter`
+    (`adapter.out.http` — primeiro adapter de saída que não é persistência neste projeto). O
+    adapter constrói seu próprio `RestClient` (via `SimpleClientHttpRequestFactory` com timeouts
+    explícitos) dentro do construtor, em vez de injetar o `RestClient.Builder` autoconfigurado do
+    Spring Boot — decisão deliberada para não depender de uma autoconfiguração que pode ter mudado
+    de pacote nesta versão bleeding-edge (mesma cautela já registrada aqui para outras
+    autoconfigurações do Boot 4.1). Classe *plain* (sem anotação Spring), com os valores de
+    `@Value` só na camada de composição (`UseCaseConfig`) — mesmo padrão de `custoOperacionalPadrao`.
+  - `PrecificarLoteService` mudou de receber um `BigDecimal cotacaoCambioPadrao` pronto para
+    injetar `CotacaoCambioPort` e buscar a cotação **uma única vez por lote** (não por item, lazy —
+    só quando há pelo menos um recebível cross-currency), evitando I/O redundante e garantindo que
+    todo o lote use o mesmo snapshot.
+  - **Escada de resiliência** dentro do adapter (nenhuma exceção de rede vaza para o service):
+    circuit breaker simples (contador de falhas consecutivas + janela de "aberto", default 3
+    falhas/30s) → tentativa HTTP com timeout curto (default 2s conexão/3s leitura) → em falha, usa
+    o último valor bom em cache (memória, `AtomicReference`) → se nunca teve nenhum, usa o valor
+    estático de segurança (`credit-engine.cotacao-cambio.fallback`, default `5.4321` — o mesmo
+    número que já era o padrão do sistema antes desta mudança).
+  - **Duas decisões de escopo confirmadas com o usuário antes de implementar** (via
+    `AskUserQuestion`, durante a fase de plano): circuit breaker feito à mão em vez de Resilience4j
+    (risco de compatibilidade com Boot 4.1, que já mordeu este projeto antes com
+    `spring-boot-starter-actuator`/`AutoConfigureMockMvc`); e não gravar a origem da cotação
+    (externa/cache/fallback) no recebível — só log (WARN) + métrica Micrometer nova
+    (`creditengine.cotacao.consultas`, tag `origem`), sem migration/coluna nova.
+  - Mock via **WireMock** (`docker-compose.yml`, serviço `cotacao-cambio-mock`, porta `8089`,
+    stub declarativo em `mocks/cotacao-cambio/mappings/cotacao-usd-brl.json` sempre retornando
+    `5.4321`) — escolhido por ser o padrão de mercado pra mockar API externa via arquivo e por
+    poder ser parado/religado via `docker compose stop/start` pra simular indisponibilidade real
+    (impossível de simular fielmente com um mock embutido no mesmo processo do backend).
+  - Painel novo no dashboard Grafana ("Consultas de cotação cambial, por origem").
+  - Testes novos: `CotacaoCambioHttpAdapterTest` (contra um `com.sun.net.httpserver.HttpServer`
+    real, não um mock de cliente HTTP — mais fiel para testar timeout/circuit breaker de verdade;
+    usa um `Clock` mutável de teste pra avançar a janela do circuito sem esperar 30s de verdade):
+    sucesso, fallback estático (nunca teve cache), fallback via cache (após um sucesso anterior),
+    circuito abre após o limite de falhas e passa a **não gerar nenhuma requisição HTTP nova**
+    (provado contando requisições recebidas pelo servidor de teste), e volta a tentar a rede depois
+    que a janela passa. `PrecificarLoteServiceTest` ganhou verificação de que o port nunca é
+    chamado para lote 100% BRL, e que é chamado **exatamente uma vez** mesmo com múltiplos itens
+    cross-currency no mesmo lote. `mvn test` → **71/71 verdes** (eram 64).
+  - **Validado manualmente de ponta a ponta, incluindo o cenário de indisponibilidade real**: subiu
+    a stack via `docker compose up`, criou lote cross-currency com o mock no ar
+    (`cotacaoCambio` retornado = `5.4321`, métrica `origem=externa`); parou o mock
+    (`docker compose stop cotacao-cambio-mock`) e repetiu — mesma cotação, agora via
+    `origem=cache`, log de WARN, chamada levou ~2s (timeout de conexão configurado); repetiu mais
+    2x seguidas e confirmou pelo log ("Circuito aberto... 3 falhas consecutivas") e pela latência
+    (~2s → ~12ms) que o circuito abriu e parou de tentar a rede; religou o mock, esperou a janela
+    de 30s passar e confirmou que voltou a `origem=externa`.
+  - **Pendente**: aguardando aprovação do usuário antes de commit/PR/release (mesmo fluxo já usado
+    nas features anteriores desta sessão).
+- **Bug real encontrado e corrigido: nginx do frontend cacheava o IP do backend, quebrando o proxy
+  depois de recriar só o container do backend.** O usuário reportou "Não foi possível processar a
+  solicitação" no frontend; a causa não era o código da feature de câmbio, e sim o ambiente: o
+  `location /api/` do `nginx.conf` usava `proxy_pass http://backend:8080/api/` com hostname
+  estático, e o nginx resolve esse tipo de upstream **uma unica vez, na inicializacao do worker**,
+  cacheando o IP pelo resto da vida do processo. Como eu tinha recriado o container `backend`
+  várias vezes ao longo da sessão (`--force-recreate`, testando a cotação de câmbio) sem nunca
+  reiniciar o `frontend`, o Docker realocou o IP antigo do backend para outro container
+  (`cotacao-cambio-mock`) — o nginx passou a mandar todo `/api/*` pra lá, que devolvia sua própria
+  página de "no stub matched" (404), disfarçada pelo frontend como o erro genérico.
+  - Corrigido com o padrão documentado do próprio nginx pra esse problema: `resolver 127.0.0.11
+    valid=10s;` (DNS embutido do Docker, sempre nesse endereço dentro de um container) + `proxy_pass`
+    usando uma **variável** (`set $backend_upstream http://backend:8080; proxy_pass
+    $backend_upstream;`) em vez de um host estático — nginx só re-resolve DNS por trás de
+    `proxy_pass` quando o valor vem de uma variável; com host fixo, o cache nunca expira.
+  - **Validado reproduzindo o bug de propósito**: subiu um container Alpine descartável ocupando o
+    IP antigo do backend (`172.18.0.7`), recriou o `backend` (ficou com `172.18.0.8`, IP realmente
+    diferente) **sem tocar no frontend**, esperou o TTL de 10s do resolver, e confirmou que
+    `GET /api/v1/lotes-recebiveis` via `localhost:3000` (proxy) voltou a funcionar normalmente —
+    sem esse fix, essa mesma sequência reproduz o erro relatado pelo usuário.
+  - Escopo do fix: só `frontend/nginx.conf`. Nenhum código de aplicação (backend ou frontend)
+    mudou; não afeta `mvn test`/`npm test`.
