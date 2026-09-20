@@ -1,13 +1,13 @@
-# SPEC.md — SRM Credit Engine
+# SPEC.md - $$$$$$$$ Credit Engine
 
 ## Visão geral
 
-A SRM Asset é referência em fundos de investimento, especialmente FIDCs (Fundos de Investimento em
+A empresa é referência em fundos de investimento, especialmente FIDCs (Fundos de Investimento em
 Direitos Creditórios). A operação consiste em adquirir ativos (duplicatas, contratos, recebíveis)
 de empresas cedentes, provendo liquidez ao mercado.
 
 Com a globalização do portfólio, o fundo passou a operar com caixa multimoedas (BRL e USD). A mesa
-de operações precisa de um sistema — o **SRM Credit Engine** — responsável por precificar e liquidar
+de operações precisa de um sistema — o **$$$$$$$$ Credit Engine** — responsável por precificar e liquidar
 esses ativos com segurança e precisão decimal.
 
 **Problema a resolver:** receber um lote de recebíveis, calcular o deságio (desconto) com base no
@@ -126,7 +126,8 @@ risco do ativo e na moeda de pagamento, e registrar a transação de forma audit
 - Consistência e conformidade regulatória, terminologia, fluxos e layout padronizados, alinhados a exigências como acessibilidade e normas do setor bancário
 
 **Segurança**:
-- No momento não irei utilizar proteção nas APIs do sistema
+- No momento não irei utilizar proteção nas APIs do sistema — raciocínio completo (por que, e como
+  isso poderia evoluir sem impacto no domínio) documentado em [`DECISIONS.md`](DECISIONS.md), item 1.
 
 **Desempenho**:
 - Latência de API: p95 abaixo de 300 ms para leituras e 500 ms para escritas em ambiente local, medido nos endpoints principais.

@@ -1,4 +1,4 @@
-# SRM Credit Engine
+# $$$$$$$$ Credit Engine
 
 [![CI](https://github.com/diegolbrito/desafio/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/diegolbrito/desafio/actions/workflows/ci.yml)
 
@@ -8,6 +8,10 @@ risco do ativo e na moeda, e registra o resultado de forma auditável.
 
 Decisões de arquitetura, premissas de negócio e convenções: [`SPEC.md`](SPEC.md).
 Histórico de implementação e decisões técnicas: [`PROGRESS.md`](PROGRESS.md).
+Decisões de mais alto nível (segurança, processo, arquitetura), com contexto e justificativa:
+[`DECISIONS.md`](DECISIONS.md).
+Architecture Decision Record (contexto, objetivo, direcionamento de arquitetura, dependências,
+riscos e requisitos): [`ADR.md`](ADR.md).
 
 ## Stack
 
@@ -15,6 +19,33 @@ Histórico de implementação e decisões técnicas: [`PROGRESS.md`](PROGRESS.md
   documentado via OpenAPI/Swagger.
 - **Frontend**: React 19.3 + TypeScript + Vite, TanStack Query, React Hook Form + Zod.
 - **Orquestração**: Docker Compose.
+
+## Fluxo de trabalho (GitHub Flow)
+
+Adotei o GitHub Flow por ser o modelo mais adequado ao contexto: um projeto de escopo definido,
+com uma única linha de produção e ciclos curtos de entrega. A `main` se mantém sempre estável e
+deployável, o trabalho acontece em branches curtas por funcionalidade e a integração passa por
+Pull Request, onde o pipeline de build e testes (ver [`.github/workflows/ci.yml`](.github/workflows/ci.yml))
+é executado antes do merge. Isso entrega rastreabilidade e qualidade sem o custo de branches de
+release e hotfix do Git Flow, que só se justificam quando há múltiplas versões suportadas
+simultaneamente.
+
+## Escopo e próximos passos
+
+Este repositório cobre o escopo do desafio — deliberadamente sem alguns itens que uma versão de
+produção exigiria (raciocínio completo por trás de cada corte em [`DECISIONS.md`](DECISIONS.md)).
+Para produção, os próximos passos incluiriam:
+
+- **OIDC com o IdP corporativo** — autenticação/autorização delegadas a um provedor já existente,
+  não reimplementadas na aplicação (ver `DECISIONS.md`, item 1).
+- **RBAC por perfil da mesa** — controle de acesso por papel (quem pode precificar, aprovar,
+  liquidar), não só autenticação.
+- **TLS** — tráfego cifrado ponta a ponta (hoje tudo roda em HTTP puro, ambiente local isolado).
+- **Mascaramento de dados do cedente em log** — hoje os logs registram `ativo` e valores em texto
+  plano; em produção, dado sensível não pode aparecer assim em log.
+- **Trilha de auditoria imutável** — o `transacao_evento` já é append-only a nível de aplicação,
+  mas não há garantia a nível de infraestrutura (ex.: hash encadeado) contra alteração
+  direta no banco.
 
 ## Estrutura do repositório
 
@@ -59,7 +90,7 @@ docker compose down -v    # idem, mas também apaga o volume do banco (reset tot
 | Métricas (Prometheus format) | http://localhost:8080/actuator/prometheus |
 | Health check | http://localhost:8080/actuator/health |
 | Prometheus | http://localhost:9090 |
-| Grafana (dashboard "SRM Credit Engine" já provisionado) | http://localhost:3001 |
+| Grafana (dashboard "$$$$$$$$ Credit Engine" já provisionado) | http://localhost:3001 |
 | Mock da cotação de câmbio (WireMock) | http://localhost:8089/api/v1/cotacoes/USD-BRL |
 
 ## Simular indisponibilidade do serviço de cotação de câmbio

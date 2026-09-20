@@ -1,4 +1,4 @@
-# PROGRESS.md — SRM Credit Engine
+# PROGRESS.md — $$$$$$$$ Credit Engine
 
 Arquivo de retomada: o que já foi feito, o que falta e decisões tomadas durante a implementação.
 Decisões de negócio/arquitetura ficam registradas em `SPEC.md` (seção "Premissas adotadas"); aqui
