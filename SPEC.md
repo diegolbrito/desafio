@@ -1,4 +1,4 @@
-# SPEC.md - $$$$$$$$ Credit Engine
+# SPEC.md - Credit Engine
 
 ## Visão geral
 
@@ -7,7 +7,7 @@ Direitos Creditórios). A operação consiste em adquirir ativos (duplicatas, co
 de empresas cedentes, provendo liquidez ao mercado.
 
 Com a globalização do portfólio, o fundo passou a operar com caixa multimoedas (BRL e USD). A mesa
-de operações precisa de um sistema — o **$$$$$$$$ Credit Engine** — responsável por precificar e liquidar
+de operações precisa de um sistema — o **  Credit Engine** — responsável por precificar e liquidar
 esses ativos com segurança e precisão decimal.
 
 **Problema a resolver:** receber um lote de recebíveis, calcular o deságio (desconto) com base no

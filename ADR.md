@@ -1,4 +1,4 @@
-# ADR.md - $$$$$$$$ Credit Engine
+# ADR.md - Credit Engine
 
 > Architecture Decision Record. Documento único cobrindo a arquitetura da solução como um todo,
 > diferente do [`DECISIONS.md`](DECISIONS.md) (registro de decisões pontuais, uma por vez, com seu
@@ -9,12 +9,12 @@
 
 ## Contexto e Problema
 
-A $$$$$$$$ é referência em fundos de investimento, especialmente FIDCs (Fundos de Investimento em
+A   é referência em fundos de investimento, especialmente FIDCs (Fundos de Investimento em
 Direitos Creditórios). A operação consiste em adquirir ativos (duplicatas, contratos, recebíveis)
 de empresas cedentes, provendo liquidez ao mercado. Com a globalização do portfólio, o fundo passou
 a operar com caixa multimoedas (BRL e USD).
 
-A mesa de operações precisa de um sistema, o **$$$$$$$$ Credit Engine**, responsável por precificar e
+A mesa de operações precisa de um sistema, o **  Credit Engine**, responsável por precificar e
 liquidar esses ativos com segurança e precisão decimal. O problema concreto a resolver: **receber
 um lote de recebíveis, calcular o deságio (desconto) com base no risco do ativo e na moeda de
 pagamento, e registrar a transação de forma auditável.**
