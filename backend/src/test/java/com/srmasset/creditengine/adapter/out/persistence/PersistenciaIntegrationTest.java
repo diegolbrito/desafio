@@ -1,7 +1,11 @@
 package com.srmasset.creditengine.adapter.out.persistence;
 
+import com.srmasset.creditengine.adapter.out.persistence.entity.CategoriaRiscoEntity;
+import com.srmasset.creditengine.adapter.out.persistence.entity.TaxaBaseEntity;
 import com.srmasset.creditengine.adapter.out.persistence.entity.TransacaoEventoEntity;
+import com.srmasset.creditengine.adapter.out.persistence.repository.CategoriaRiscoJpaRepository;
 import com.srmasset.creditengine.adapter.out.persistence.repository.LoteRecebivelJpaRepository;
+import com.srmasset.creditengine.adapter.out.persistence.repository.TaxaBaseJpaRepository;
 import com.srmasset.creditengine.adapter.out.persistence.repository.TransacaoEventoJpaRepository;
 import com.srmasset.creditengine.application.metrics.CreditEngineMetrics;
 import com.srmasset.creditengine.application.port.in.ComandoPrecificarLote;
@@ -17,6 +21,8 @@ import com.srmasset.creditengine.domain.StatusLote;
 import com.srmasset.creditengine.domain.StatusRecebivel;
 import com.srmasset.creditengine.domain.TipoEventoTransacao;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -29,6 +35,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
@@ -73,6 +80,12 @@ class PersistenciaIntegrationTest {
     private TransacaoEventoJpaRepository eventoRepository;
     @Autowired
     private RecebivelLiquidacaoPersistenceAdapter liquidacaoAdapter;
+    @Autowired
+    private CategoriaRiscoJpaRepository categoriaRiscoRepository;
+    @Autowired
+    private TaxaBaseJpaRepository taxaBaseRepository;
+    @PersistenceContext
+    private EntityManager entityManager;
 
     @Test
     void seedsDeTaxaBaseEstaoDisponiveis() {
@@ -84,6 +97,51 @@ class PersistenciaIntegrationTest {
     void seedsDeCategoriaRiscoEstaoDisponiveis() {
         assertThat(categoriaRiscoAdapter.buscarSpread(CategoriaRisco.AA)).isEqualByComparingTo("0.015000");
         assertThat(categoriaRiscoAdapter.buscarSpread(CategoriaRisco.E)).isEqualByComparingTo("0.009489");
+    }
+
+    @Test
+    void categoriaRiscoETaxaBaseSeguemAConvencaoDeSoftDelete() {
+        // ver SPEC.md "Banco de dados": toda tabela de dominio tem deleted_at, nada e' deletado
+        // fisicamente - categoria_risco/taxa_base sao tabelas de dominio (referencia), nao a
+        // excecao append-only (essa e' so' transacao_evento).
+        CategoriaRiscoEntity categoriaRisco = categoriaRiscoRepository.findByCodigo(CategoriaRisco.B).orElseThrow();
+        TaxaBaseEntity taxaBase = taxaBaseRepository.findByMoeda(Moeda.BRL).orElseThrow();
+        UUID categoriaRiscoId = categoriaRisco.getId();
+        UUID taxaBaseId = taxaBase.getId();
+
+        // seed nao esta "deletado"
+        assertThat(categoriaRisco.getDeletedAt()).isNull();
+        assertThat(taxaBase.getDeletedAt()).isNull();
+
+        OffsetDateTime agora = OffsetDateTime.now();
+        categoriaRisco.marcarComoDeletado(agora);
+        taxaBase.marcarComoDeletado(agora);
+        categoriaRiscoRepository.saveAndFlush(categoriaRisco);
+        taxaBaseRepository.saveAndFlush(taxaBase);
+        entityManager.clear(); // forca reler do banco, nao do cache de 1o nivel
+
+        // @SQLRestriction("deleted_at is null") esconde o registro de qualquer consulta do
+        // Hibernate para essa entidade - e' isso que garante que soft delete tem efeito de
+        // verdade, nao so' um valor gravado sem consequencia
+        assertThat(categoriaRiscoRepository.findById(categoriaRiscoId)).isEmpty();
+        assertThat(categoriaRiscoRepository.findByCodigo(CategoriaRisco.B)).isEmpty();
+        assertThat(taxaBaseRepository.findById(taxaBaseId)).isEmpty();
+        assertThat(taxaBaseRepository.findByMoeda(Moeda.BRL)).isEmpty();
+
+        // e continua fisicamente no banco, so' marcado - consulta nativa (fora do Hibernate,
+        // sem hidratar a entidade) contorna o @SQLRestriction de proposito, so' pra provar isso.
+        // O driver JDBC devolve timestamptz como Instant numa query nativa sem mapeamento de
+        // entidade (nao OffsetDateTime, que so' vem via conversao do Hibernate/JPA).
+        Instant deletedAtPersistidoCategoria = (Instant) entityManager
+                .createNativeQuery("select deleted_at from categoria_risco where id = ?1")
+                .setParameter(1, categoriaRiscoId)
+                .getSingleResult();
+        Instant deletedAtPersistidoTaxaBase = (Instant) entityManager
+                .createNativeQuery("select deleted_at from taxa_base where id = ?1")
+                .setParameter(1, taxaBaseId)
+                .getSingleResult();
+        assertThat(deletedAtPersistidoCategoria).isCloseTo(agora.toInstant(), byLessThan(1, ChronoUnit.SECONDS));
+        assertThat(deletedAtPersistidoTaxaBase).isCloseTo(agora.toInstant(), byLessThan(1, ChronoUnit.SECONDS));
     }
 
     @Test
