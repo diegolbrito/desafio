@@ -10,6 +10,8 @@ servers:
 tags:
 - name: Lotes de recebiveis
   description: "Recebimento, precificacao e consulta de lotes de recebiveis"
+- name: Extrato de liquidacao
+  description: "Relatorio analitico de recebiveis liquidados, com filtro por periodo/ativo/moeda"
 paths:
   /api/v1/lotes-recebiveis/{loteId}/recebiveis/{recebivelId}/liquidacao:
     put:
@@ -130,6 +132,62 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/LoteRecebiveisResponse"
+  /api/v1/extrato-liquidacao:
+    get:
+      tags:
+      - Extrato de liquidacao
+      summary: "Lista recebiveis liquidados, paginado"
+      description: "Filtros opcionais: periodo (dataInicio/dataFim sobre liquidadoEm),\
+        \ ativo (busca parcial, case-insensitive) e moeda (moedaPagamento). So' recebiveis\
+        \ com status LIQUIDADO aparecem aqui."
+      operationId: buscar
+      parameters:
+      - name: dataInicio
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: dataFim
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: ativo
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: moeda
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - BRL
+          - USD
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PaginaResponseExtratoLiquidacaoItemResponse"
 components:
   schemas:
     RecebivelResponse:
@@ -283,6 +341,68 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/LoteRecebiveisResumoResponse"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    ExtratoLiquidacaoItemResponse:
+      type: object
+      properties:
+        recebivelId:
+          type: string
+          format: uuid
+        loteId:
+          type: string
+          format: uuid
+        ativo:
+          type: string
+        valorBruto:
+          type: string
+          example: "15000.00"
+        valorPresente:
+          type: string
+          example: "14200.00"
+        valorDesagio:
+          type: string
+          example: "800.00"
+        moedaPagamento:
+          type: string
+          enum:
+          - BRL
+          - USD
+        cotacaoCambio:
+          type: string
+          example: "5.20"
+        categoriaRisco:
+          type: string
+          enum:
+          - AA
+          - A
+          - B
+          - C
+          - D
+          - E
+        dataVencimento:
+          type: string
+          format: date
+        liquidadoEm:
+          type: string
+          format: date-time
+    PaginaResponseExtratoLiquidacaoItemResponse:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExtratoLiquidacaoItemResponse"
         page:
           type: integer
           format: int32

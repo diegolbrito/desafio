@@ -1,10 +1,12 @@
 package com.srmasset.creditengine.config;
 
 import com.srmasset.creditengine.application.metrics.CreditEngineMetrics;
+import com.srmasset.creditengine.application.port.in.BuscarExtratoLiquidacaoUseCase;
 import com.srmasset.creditengine.application.port.in.BuscarLoteRecebiveisUseCase;
 import com.srmasset.creditengine.application.port.in.LiquidarRecebivelUseCase;
 import com.srmasset.creditengine.application.port.in.ListarLotesRecebiveisUseCase;
 import com.srmasset.creditengine.application.port.in.PrecificarLoteUseCase;
+import com.srmasset.creditengine.application.port.out.BuscarExtratoLiquidacaoPort;
 import com.srmasset.creditengine.application.port.out.BuscarLoteRecebiveisPort;
 import com.srmasset.creditengine.application.port.out.CategoriaRiscoRepositoryPort;
 import com.srmasset.creditengine.application.port.out.CotacaoCambioPort;
@@ -13,6 +15,7 @@ import com.srmasset.creditengine.application.port.out.ListarLotesRecebiveisPort;
 import com.srmasset.creditengine.application.port.out.RegistrarEventoTransacaoPort;
 import com.srmasset.creditengine.application.port.out.SalvarLoteRecebiveisPort;
 import com.srmasset.creditengine.application.port.out.TaxaBaseRepositoryPort;
+import com.srmasset.creditengine.application.service.BuscarExtratoLiquidacaoService;
 import com.srmasset.creditengine.application.service.BuscarLoteRecebiveisService;
 import com.srmasset.creditengine.application.service.LiquidarRecebivelService;
 import com.srmasset.creditengine.application.service.ListarLotesRecebiveisService;
@@ -91,5 +94,10 @@ public class UseCaseConfig {
                                                                Clock clock,
                                                                CreditEngineMetrics metrics) {
         return new LiquidarRecebivelService(liquidarRecebivelPort, registrarEventoPort, clock, metrics);
+    }
+
+    @Bean
+    public BuscarExtratoLiquidacaoUseCase buscarExtratoLiquidacaoUseCase(BuscarExtratoLiquidacaoPort port) {
+        return new BuscarExtratoLiquidacaoService(port);
     }
 }
