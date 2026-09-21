@@ -12,6 +12,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.net.URI;
 import java.util.List;
@@ -68,6 +69,18 @@ public class GlobalExceptionHandler {
         problem.setInstance(URI.create(request.getRequestURI()));
 
         log.warn("Parametro invalido: {} {} - {}", request.getMethod(), request.getRequestURI(), ex.getMessage());
+        return problem;
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ProblemDetail tratarTipoDeParametroInvalido(MethodArgumentTypeMismatchException ex,
+                                                         HttpServletRequest request) {
+        String detalhe = "Parametro '%s' possui valor invalido: %s".formatted(ex.getName(), ex.getValue());
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, detalhe);
+        problem.setTitle("Parametro invalido");
+        problem.setInstance(URI.create(request.getRequestURI()));
+
+        log.warn("Parametro invalido: {} {} - {}", request.getMethod(), request.getRequestURI(), detalhe);
         return problem;
     }
 

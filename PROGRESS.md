@@ -277,6 +277,57 @@ commit/PR/release, mesmo fluxo já usado nas features anteriores.
     na listagem em seguida, e a porta 8080 do backend continua acessível diretamente (inclusive
     o Swagger UI). `mvn test` (backend) → 33/33 verdes após as mudanças desta etapa.
 
+- **Extrato de liquidação (SPEC.md item 12, implementado e validado, ainda não commitado)**:
+  relatório analítico cross-lote, `GET /api/v1/extrato-liquidacao`, com filtro por período/ativo/
+  moeda e paginação — decisão explícita do usuário de usar SQL nativo (`NamedParameterJdbcTemplate`)
+  em vez de JPA/Criteria só para este relatório (resto do sistema continua 100% Hibernate).
+  - Novo adapter `ExtratoLiquidacaoJdbcAdapter`, único no sistema que lê via `JdbcTemplate` puro —
+    por isso `@SQLRestriction("deleted_at is null")` (que só se aplica a consultas Hibernate) não
+    protege esta query, e o `WHERE deleted_at IS NULL` foi adicionado manualmente na SQL.
+  - Migration `V202609181011`: índice parcial em `(liquidado_em desc) where status = 'LIQUIDADO'` +
+    índice GIN trigram (`pg_trgm`) em `ativo`, para a busca parcial case-insensitive não virar
+    `seq scan` com volume.
+  - Contagem de página via `count(*) OVER()` na mesma query (sem round-trip extra de `COUNT(*)`).
+  - **Bug real encontrado e corrigido durante os testes**: consultas via `JdbcTemplate` puro não
+    disparam o auto-flush do Hibernate (que só ocorre antes de queries que o próprio Hibernate
+    executa) — os testes de integração (adapter e controller) precisaram de `entityManager.flush()`
+    explícito entre escrever via JPA e ler via SQL nativo, senão a última escrita da sequência ficava
+    pendente na sessão e invisível para a query nativa dentro da mesma transação de teste (nunca
+    comitada). Em produção isso não é um bug real (cada requisição HTTP comita ao final), mas é uma
+    armadilha real de teste, documentada nos comentários dos próprios testes.
+  - **Bug real encontrado e corrigido (não relacionado a testes)**: `GlobalExceptionHandler` não
+    tinha handler para `MethodArgumentTypeMismatchException` (conversão de enum de query param
+    inválida, ex. `moeda=EUR`), caindo no handler genérico e retornando `500` em vez de `400`. Este
+    endpoint é o primeiro do sistema com um `@RequestParam` de enum tipado (os demais usam apenas
+    `int`/`String`), por isso o gap nunca tinha sido exercitado antes. Corrigido com um handler
+    dedicado retornando `400` com detalhe do parâmetro/valor inválido.
+  - `mvn test` completo verde (82/82, via Docker/Testcontainers), incluindo os novos testes do
+    adapter (Testcontainers + Postgres real) e do controller (MockMvc).
+  - Validação manual via `docker compose`: 3 recebíveis criados/precificados/liquidados via API
+    (BRL e USD), extrato consultado com filtro por ativo, por moeda e sem filtro, `400` confirmado
+    para moeda inválida, paginação com contagem total correta.
+  - `EXPLAIN` confirmado com volume sintético (50 mil linhas geradas via SQL, depois removidas):
+    `Index Scan using ix_recebivel_liquidado_em` para filtro de período e `Bitmap Index Scan on
+    ix_recebivel_ativo_trgm` para o filtro de ativo — com a tabela pequena (17 linhas reais), o
+    planner corretamente prefere `Seq Scan` (custo-benefício correto para tabelas pequenas); os
+    índices existem prontos para quando o volume justificar seu uso, confirmado empiricamente.
+
+- **Teste de contrato de API (SPEC.md item 13)**: pergunta do usuário ("vc criou testes automatizados
+  de contrato das apis?") revelou uma lacuna real: `openapi.yaml` (raiz do repo) era um snapshot
+  estático desatualizado (último touch no commit da feature de liquidação) que nem sequer mencionava
+  o endpoint de extrato de liquidação, sem nenhuma verificação automatizada de que o arquivo bate com
+  a API real.
+  - Regenerado via `curl http://localhost:8080/v3/api-docs.yaml -o openapi.yaml` (backend já
+    reconstruído com o código novo via docker-compose).
+  - Novo `OpenApiContractTest`: compara a spec real (`GET /v3/api-docs.yaml` em runtime) com o
+    arquivo commitado, como estrutura (`Map` via SnakeYAML, já transitiva do Spring Boot) em vez de
+    texto bruto, para não quebrar por diferença cosmética de formatação/ordem.
+  - Campo `servers` deliberadamente excluído da comparação: o springdoc infere host/porta a partir
+    da requisição HTTP usada para gerar a spec, e a requisição sintética do MockMvc não carrega uma
+    porta real (`http://localhost` vs `http://localhost:8080` de uma chamada via docker-compose) -
+    não faz parte do contrato de fato (endpoints/schemas/parâmetros).
+  - `mvn test` (`OpenApiContractTest` isolado e suíte completa) verde após o ajuste.
+
 ## Decisões técnicas tomadas durante a implementação
 - Ambiente local não possui Maven/Node/JDK 25 instalados (apenas JDK 24 e Docker Desktop
   disponíveis). Build e testes do backend são validados via imagem Docker de Maven+JDK 25
