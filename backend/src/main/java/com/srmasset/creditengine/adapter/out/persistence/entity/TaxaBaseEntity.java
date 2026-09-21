@@ -10,6 +10,7 @@ import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.SQLRestriction;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.UuidGenerator;
 import org.hibernate.type.SqlTypes;
@@ -18,9 +19,14 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
-/** Tabela de referencia (seed via migration); somente leitura pela aplicacao. */
+/**
+ * Tabela de referencia (seed via migration); somente leitura pela aplicacao.
+ * {@code @SQLRestriction} aplica "deleted_at is null" em toda consulta gerada
+ * pelo Hibernate para esta entidade - ver SPEC.md "Banco de dados".
+ */
 @Entity
 @Table(name = "taxa_base")
+@SQLRestriction("deleted_at is null")
 public class TaxaBaseEntity {
 
     @Id
@@ -47,6 +53,9 @@ public class TaxaBaseEntity {
     @Column(name = "version", nullable = false)
     private Integer version;
 
+    @Column(name = "deleted_at")
+    private OffsetDateTime deletedAt;
+
     protected TaxaBaseEntity() {
     }
 
@@ -60,5 +69,14 @@ public class TaxaBaseEntity {
 
     public BigDecimal getTaxaVigente() {
         return taxaVigente;
+    }
+
+    public OffsetDateTime getDeletedAt() {
+        return deletedAt;
+    }
+
+    /** Soft delete (ver SPEC.md "Banco de dados"): nada e' deletado fisicamente. */
+    public void marcarComoDeletado(OffsetDateTime agora) {
+        this.deletedAt = agora;
     }
 }

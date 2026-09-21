@@ -11,6 +11,7 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.SQLRestriction;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.UuidGenerator;
 
@@ -20,8 +21,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * {@code @SQLRestriction} aplica "deleted_at is null" em toda consulta gerada
+ * pelo Hibernate para esta entidade (findById, findAll, JPQL) - ver SPEC.md
+ * "Banco de dados": nada e' deletado fisicamente, soft delete via deleted_at.
+ * Sem isso, um registro marcado como deletado continuaria aparecendo
+ * normalmente em qualquer consulta.
+ */
 @Entity
 @Table(name = "lote_recebivel")
+@SQLRestriction("deleted_at is null")
 public class LoteRecebivelEntity {
 
     @Id
