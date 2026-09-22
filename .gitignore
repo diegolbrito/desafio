@@ -21,6 +21,9 @@ frontend/*.tsbuildinfo
 .DS_Store
 Thumbs.db
 
+# draw.io (arquivos de backup do app desktop)
+.$*.bkp
+
 # Ambiente
 .env
 .env.local
